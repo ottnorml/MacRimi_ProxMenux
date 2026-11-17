@@ -129,11 +129,11 @@ def _is_valid_fw_iface(value):
         return True
     return isinstance(value, str) and bool(_FW_IFACE_RE.match(value))
 
-def _run_cmd(cmd, timeout=10):
-    """Run a shell command and return (returncode, stdout, stderr)"""
+def _run_cmd(cmd, timeout=10, cwd=None):
+    """Run a command and return (returncode, stdout, stderr); optionally set cwd."""
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout
+            cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd
         )
         return result.returncode, result.stdout.strip(), result.stderr.strip()
     except subprocess.TimeoutExpired:
@@ -1660,7 +1660,9 @@ def _detect_lynis():
 
     if lynis_cmd:
         info["installed"] = True
-        rc, out, _ = _run_cmd([lynis_cmd, "show", "version"])
+        # Direct Git execution requires the checkout's working directory.
+        lynis_cwd = "/opt/lynis" if lynis_cmd == "/opt/lynis/lynis" else None
+        rc, out, _ = _run_cmd([lynis_cmd, "show", "version"], cwd=lynis_cwd)
         if rc == 0:
             info["version"] = out.strip()
 
@@ -1712,6 +1714,8 @@ def run_lynis_audit():
         lynis_cmd = _find_lynis_cmd()
         if not lynis_cmd:
             return False, "Lynis is not installed"
+        # The Git checkout is directly executable only from its directory.
+        lynis_cwd = "/opt/lynis" if lynis_cmd == "/opt/lynis/lynis" else None
 
         _lynis_audit_running = True
         _lynis_audit_progress = "starting"
@@ -1748,7 +1752,7 @@ def run_lynis_audit():
                 result = subprocess.run(
                     script_cmd,
                     capture_output=True, text=True, timeout=600,
-                    env={**os.environ, "TERM": "dumb"}
+                    env={**os.environ, "TERM": "dumb"}, cwd=lynis_cwd
                 )
                 rc = result.returncode
                 out = result.stdout.strip()
@@ -1765,7 +1769,7 @@ def run_lynis_audit():
                 try:
                     rc, out, err = _run_cmd(
                         [lynis_cmd, "audit", "system", "--no-colors", "--quick"],
-                        timeout=600
+                        timeout=600, cwd=lynis_cwd
                     )
                     if out:
                         with open(output_log, "w") as fout:
