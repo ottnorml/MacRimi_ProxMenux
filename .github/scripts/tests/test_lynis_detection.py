@@ -1,5 +1,6 @@
 """Inert regression tests for Lynis detection and installation ownership (#675)."""
 import ast
+import io
 import os
 import re
 import subprocess
@@ -7,6 +8,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[3]
 BASH = ROOT / "scripts/security/lynis_installer.sh"
@@ -40,7 +42,8 @@ class LynisDetection(unittest.TestCase):
         fake_os = SimpleNamespace(path=fake_path,
                                   access=lambda path, mode: path in paths, X_OK=os.X_OK)
         ns = {"os": fake_os, "shutil": SimpleNamespace(which=lambda name: None),
-              "_lynis_is_managed_wrapper": lambda: wrapper}
+              "_lynis_is_managed_wrapper": lambda: wrapper,
+              "_lynis_git_checkout_owned": lambda: git}
         return extracted_python("_find_lynis_installation", ns)()
 
     def test_python_finds_apt_with_restricted_path(self):
@@ -147,7 +150,11 @@ class LynisDetection(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
             git = root / "opt/lynis"
-            (git / ".git").mkdir(parents=True)
+            git.mkdir(parents=True)
+            subprocess.run(["git", "-C", str(git), "init", "-q"], check=True)
+            subprocess.run(["git", "-C", str(git), "remote", "add", "origin",
+                            "https://github.com/CISOfy/lynis.git"], check=True)
+            (git / ".proxmenux-managed").write_text("proxmenux-lynis-git-v1\n")
             binary = git / "lynis"
             binary.write_text("#!/bin/sh\necho git-version\n")
             binary.chmod(0o755)
@@ -166,6 +173,67 @@ class LynisDetection(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "true|git|git-version")
 
 
+
+
+    def test_bash_foreign_wrapper_with_extra_commands_is_not_managed(self):
+        source = BASH.read_text()
+        match = re.search(r"^lynis_is_managed_wrapper\(\) \{\n.*?^\}\n",
+                          source, re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(match)
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "lynis"
+            path.write_text('#!/bin/bash\ncd /opt/lynis && ./lynis "$@"\necho foreign\n')
+            path.chmod(0o755)
+            func = match.group().replace("/usr/local/bin/lynis", str(path))
+            actual = subprocess.run(["bash", "-c", func + "\nlynis_is_managed_wrapper\n"],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(actual.returncode, 0)
+            path.write_text('#!/bin/bash\ncd /opt/lynis && ./lynis "$@"\n')
+            actual = subprocess.run(["bash", "-c", func + "\nlynis_is_managed_wrapper\n"],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(actual.returncode, 0, actual.stderr)
+
+    def test_python_foreign_wrapper_with_extra_commands_is_not_managed(self):
+        path = "/usr/local/bin/lynis"
+        fake_os = SimpleNamespace(path=SimpleNamespace(
+            islink=lambda p: False, isfile=lambda p: p == path),
+            access=lambda p, mode: True, X_OK=os.X_OK)
+        run = extracted_python("_lynis_is_managed_wrapper", {"os": fake_os})
+        exact = b'#!/bin/bash\ncd /opt/lynis && ./lynis "$@"\n'
+        for contents, expected in ((exact, True), (exact + b"echo foreign\n", False)):
+            with self.subTest(extra_bytes=len(contents)-len(exact)):
+                with patch("builtins.open", side_effect=lambda *a, **k: io.BytesIO(contents)):
+                    self.assertEqual(run(), expected)
+
+    def test_bash_foreign_git_remote_is_never_proxmenux_owned(self):
+        source = BASH.read_text()
+        functions = []
+        for name in ("lynis_git_checkout", "lynis_is_managed_wrapper"):
+            match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
+                              re.MULTILINE | re.DOTALL)
+            self.assertIsNotNone(match, name)
+            functions.append(match.group())
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            git = root / "opt/lynis"
+            git.mkdir(parents=True)
+            subprocess.run(["git", "-C", str(git), "init", "-q"], check=True)
+            subprocess.run(["git", "-C", str(git), "remote", "add", "origin",
+                            "https://github.com/foreign/unrelated.git"], check=True)
+            (git / "lynis").write_text("#!/bin/sh\necho foreign\n")
+            (git / "lynis").chmod(0o755)
+            (git / ".proxmenux-managed").write_text("proxmenux-lynis-git-v1\n")
+            script = "\n".join(functions).replace("/opt/lynis", str(git))
+            script = script.replace("/usr/local/bin/lynis", str(root / "usr/local/bin/lynis"))
+            result = subprocess.run(["bash", "-c", script + "\nlynis_git_checkout\n"],
+                                    capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_python_git_checkout_requires_provenance(self):
+        self.assertIn("def _lynis_git_checkout_owned():", PYTHON.read_text())
+        self.assertIn("git -C", BASH.read_text())
+        self.assertIn(".proxmenux-managed", BASH.read_text())
+        self.assertIn(".proxmenux-managed", PYTHON.read_text())
 
 
 if __name__ == "__main__":
