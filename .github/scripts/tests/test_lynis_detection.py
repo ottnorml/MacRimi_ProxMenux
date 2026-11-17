@@ -267,5 +267,54 @@ class LynisDetection(unittest.TestCase):
         self.assertIn(".proxmenux-managed", PYTHON.read_text())
 
 
+    def test_monitor_git_version_runs_in_checkout_directory(self):
+        # Inert AST execution: never invoke the actual Lynis executable.
+        calls = []
+        def run(cmd, **kwargs):
+            calls.append((cmd, kwargs))
+            return 0, "3.1.7", ""
+        ns = {"os": SimpleNamespace(path=SimpleNamespace(isfile=lambda path: False)),
+              "parse_lynis_report": lambda: None, "_run_cmd": run,
+              "_find_lynis_installation": lambda: ("/opt/lynis/lynis", "git")}
+        info = extracted_python("_detect_lynis", ns)()
+        self.assertTrue(info["installed"])
+        self.assertEqual(info["version"], "3.1.7")
+        self.assertEqual(calls[0][1].get("cwd"), "/opt/lynis")
+        calls.clear()
+        ns["_find_lynis_installation"] = lambda: ("/usr/sbin/lynis", "external")
+        extracted_python("_detect_lynis", ns)()
+        self.assertIsNone(calls[0][1].get("cwd"))
+
+    def test_monitor_git_audit_uses_checkout_cwd_for_pty_and_fallback(self):
+        import threading
+        for binary, expected_cwd in (("/opt/lynis/lynis", "/opt/lynis"),
+                                     ("/usr/sbin/lynis", None)):
+            with self.subTest(binary=binary):
+                script_calls, fallback_calls = [], []
+                def run_script(cmd, **kwargs):
+                    script_calls.append((cmd, kwargs))
+                    return SimpleNamespace(returncode=0, stdout="", stderr="")
+                def run_fallback(cmd, **kwargs):
+                    fallback_calls.append((cmd, kwargs))
+                    return 0, "", ""
+                fake_os = SimpleNamespace(
+                    path=SimpleNamespace(isfile=lambda path: False),
+                    environ={},
+                    remove=lambda path: self.fail("unexpected file deletion"))
+                ns = {"os": fake_os, "subprocess": SimpleNamespace(run=run_script),
+                      "_run_cmd": run_fallback, "_find_lynis_cmd": lambda: binary,
+                      "_state_lock": threading.Lock(),
+                      "_lynis_audit_running": False, "_lynis_audit_progress": ""}
+                audit = extracted_python("run_lynis_audit", ns)
+                with patch("threading.Thread", side_effect=lambda target, daemon:
+                           SimpleNamespace(start=target)):
+                    accepted, _ = audit()
+                self.assertTrue(accepted)
+                self.assertEqual(ns["_lynis_audit_progress"], "completed")
+                self.assertEqual(script_calls[0][1].get("cwd"), expected_cwd)
+                self.assertEqual(fallback_calls[0][1].get("cwd"), expected_cwd)
+
+
+
 if __name__ == "__main__":
     unittest.main()
