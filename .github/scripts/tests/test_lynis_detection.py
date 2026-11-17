@@ -83,7 +83,7 @@ class LynisDetection(unittest.TestCase):
 
     def test_bash_detects_package_in_inert_filesystem(self):
         source = BASH.read_text()
-        names = ("lynis_git_checkout", "lynis_is_managed_wrapper", "lynis_run", "detect_lynis")
+        names = ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "detect_lynis")
         parts = []
         for name in names:
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
@@ -111,7 +111,7 @@ class LynisDetection(unittest.TestCase):
     def test_package_symlink_is_not_a_safe_install_target(self):
         source = BASH.read_text()
         parts = []
-        for name in ("lynis_is_managed_wrapper", "lynis_install_target_safe"):
+        for name in ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_install_target_safe"):
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
                               re.MULTILINE | re.DOTALL)
             self.assertIsNotNone(match, name)
@@ -142,7 +142,7 @@ class LynisDetection(unittest.TestCase):
     def test_git_detection_runs_without_wrapper(self):
         source = BASH.read_text()
         parts = []
-        for name in ("lynis_git_checkout", "lynis_is_managed_wrapper", "lynis_run", "detect_lynis"):
+        for name in ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "detect_lynis"):
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
                               re.MULTILINE | re.DOTALL)
             self.assertIsNotNone(match, name)
@@ -208,7 +208,7 @@ class LynisDetection(unittest.TestCase):
     def test_bash_foreign_git_remote_is_never_proxmenux_owned(self):
         source = BASH.read_text()
         functions = []
-        for name in ("lynis_git_checkout", "lynis_is_managed_wrapper"):
+        for name in ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout"):
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
                               re.MULTILINE | re.DOTALL)
             self.assertIsNotNone(match, name)
@@ -228,6 +228,37 @@ class LynisDetection(unittest.TestCase):
             result = subprocess.run(["bash", "-c", script + "\nlynis_git_checkout\n"],
                                     capture_output=True, text=True, timeout=10)
             self.assertNotEqual(result.returncode, 0)
+
+    def test_python_checkout_remote_and_marker(self):
+        def check(remote, marker, wrapper):
+            fake_path = SimpleNamespace(islink=lambda path: False,
+                isdir=lambda path: path == "/opt/lynis/.git",
+                isfile=lambda path: path == "/opt/lynis/lynis")
+            fake_os = SimpleNamespace(path=fake_path,
+                access=lambda p, mode: p == "/opt/lynis/lynis", X_OK=os.X_OK)
+            process = SimpleNamespace(returncode=0, stdout=remote)
+            runner = SimpleNamespace(run=lambda *args, **kwargs: process,
+                                     TimeoutExpired=subprocess.TimeoutExpired)
+            ns = {"os": fake_os, "subprocess": runner,
+                  "_lynis_has_managed_marker": lambda: marker,
+                  "_lynis_is_managed_wrapper": lambda: wrapper}
+            return extracted_python("_lynis_git_checkout_owned", ns)()
+        official = "https://github.com/CISOfy/lynis.git\n"
+        foreign = "https://github.com/elsewhere/lynis.git\n"
+        self.assertTrue(check(official, True, False))
+        self.assertTrue(check(official, False, True))   # legacy
+        self.assertFalse(check(official, False, False)) # unknown checkout
+        self.assertFalse(check(foreign, True, True))    # spoofed marker
+
+    def test_python_marker_requires_complete_contents(self):
+        path = "/opt/lynis/.proxmenux-managed"
+        fake_os = SimpleNamespace(path=SimpleNamespace(
+            islink=lambda p: False, isfile=lambda p: p == path))
+        check = extracted_python("_lynis_has_managed_marker", {"os": fake_os})
+        good = b"proxmenux-lynis-git-v1\n"
+        for contents, expected in ((good, True), (good + b"extra\n", False)):
+            with patch("builtins.open", side_effect=lambda *a, **k: io.BytesIO(contents)):
+                self.assertEqual(check(), expected)
 
     def test_python_git_checkout_requires_provenance(self):
         self.assertIn("def _lynis_git_checkout_owned():", PYTHON.read_text())

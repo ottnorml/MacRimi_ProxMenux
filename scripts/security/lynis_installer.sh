@@ -61,21 +61,41 @@ initialize_cache
 # ==========================================================
 # Detection
 # ==========================================================
-lynis_git_checkout() {
-  [[ ! -L /opt/lynis && -d /opt/lynis/.git &&
-     -f /opt/lynis/lynis && -x /opt/lynis/lynis ]]
-}
-
 lynis_is_managed_wrapper() {
+  # Compare every byte: matching two lines is not sufficient for ownership.
   [[ ! -L /usr/local/bin/lynis &&
      -f /usr/local/bin/lynis && -x /usr/local/bin/lynis ]] &&
-    grep -Fxq '#!/bin/bash' /usr/local/bin/lynis &&
-    grep -Fxq 'cd /opt/lynis && ./lynis "$@"' /usr/local/bin/lynis
+    cmp -s /usr/local/bin/lynis <(printf '#!/bin/bash\ncd /opt/lynis && ./lynis "$@"\n')
+}
+
+lynis_managed_marker() {
+  local marker=/opt/lynis/.proxmenux-managed
+  [[ ! -L "$marker" && -f "$marker" ]] &&
+    cmp -s "$marker" <(printf 'proxmenux-lynis-git-v1\n')
+}
+
+lynis_git_checkout() {
+  # A directory named .git does not prove ProxMenux owns the checkout.
+  [[ ! -L /opt/lynis && -d /opt/lynis/.git &&
+     ! -L /opt/lynis/.git && -f /opt/lynis/lynis &&
+     ! -L /opt/lynis/lynis && -x /opt/lynis/lynis ]] || return 1
+
+  local remote
+  remote="$(git -C /opt/lynis remote get-url origin 2>/dev/null)" || return 1
+  case "$remote" in
+    https://github.com/CISOfy/lynis|https://github.com/CISOfy/lynis.git|\
+git@github.com:CISOfy/lynis|git@github.com:CISOfy/lynis.git) ;;
+    *) return 1 ;;
+  esac
+
+  # New installs have an explicit marker. Legacy installs are recognized
+  # only if their *complete* ProxMenux wrapper and Git remote both match.
+  lynis_managed_marker || lynis_is_managed_wrapper
 }
 
 lynis_install_target_safe() {
   if [[ -e /usr/local/bin/lynis || -L /usr/local/bin/lynis ]]; then
-    [[ -d /opt/lynis/.git ]] && lynis_is_managed_wrapper
+    lynis_git_checkout && lynis_is_managed_wrapper
   else
     return 0
   fi
@@ -154,8 +174,7 @@ install_lynis() {
   fi
 
   # Reject unowned paths and symlinks before deleting or cloning files.
-  if [[ -L /opt/lynis ]] ||
-     { [[ -d /opt/lynis ]] && [[ ! -d /opt/lynis/.git ]]; } ||
+  if { [[ -e /opt/lynis || -L /opt/lynis ]] && ! lynis_git_checkout; } ||
      ! lynis_install_target_safe; then
     msg_error "$(translate "Existing Lynis files are not managed by ProxMenux. Refusing to overwrite them.")"
     return 1
@@ -173,6 +192,10 @@ install_lynis() {
   msg_info "$(translate "Cloning Lynis from GitHub...")"
   pmx_record_execution "install Lynis in /opt/lynis" "git clone https://github.com/CISOfy/lynis.git /opt/lynis"
   if git clone --quiet https://github.com/CISOfy/lynis.git /opt/lynis >/dev/null 2>&1; then
+    if ! printf 'proxmenux-lynis-git-v1\n' > /opt/lynis/.proxmenux-managed; then
+      msg_error "$(translate "Could not record Lynis installation ownership.")"
+      return 1
+    fi
     # pmx_write_file follows symlinks; recheck just before writing.
     if ! lynis_install_target_safe; then
       msg_error "$(translate "Unsafe Lynis wrapper target. Refusing to overwrite it.")"
@@ -288,7 +311,7 @@ uninstall_lynis() {
   msg_info2 "$(translate "Removing Lynis...")"
 
   detect_lynis
-  if [[ "$LYNIS_SOURCE" != "git" ]]; then
+  if [[ "$LYNIS_SOURCE" != "git" ]] || ! lynis_git_checkout; then
     msg_error "$(translate "This installation is externally managed. Use its package manager to remove Lynis.")"
     return 1
   fi

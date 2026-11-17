@@ -1571,25 +1571,61 @@ def _detect_fail2ban():
 
 
 def _lynis_is_managed_wrapper():
-    """Recognize the ProxMenux wrapper, never a foreign symlink."""
+    """Require the complete ProxMenux wrapper, not merely its first lines."""
     path = "/usr/local/bin/lynis"
     if os.path.islink(path) or not os.path.isfile(path) or not os.access(path, os.X_OK):
         return False
+    expected = b'#!/bin/bash\ncd /opt/lynis && ./lynis "$@"\n'
     try:
-        with open(path, encoding="utf-8") as handle:
-            return (handle.readline().strip() == "#!/bin/bash"
-                    and handle.readline().strip() == 'cd /opt/lynis && ./lynis "$@"')
-    except (OSError, UnicodeError):
+        with open(path, "rb") as handle:
+            return handle.read(len(expected) + 1) == expected
+    except OSError:
         return False
+
+
+def _lynis_has_managed_marker():
+    """Recognize the explicit provenance marker written on new installs."""
+    path = "/opt/lynis/.proxmenux-managed"
+    if os.path.islink(path) or not os.path.isfile(path):
+        return False
+    expected = b"proxmenux-lynis-git-v1\n"
+    try:
+        with open(path, "rb") as handle:
+            return handle.read(len(expected) + 1) == expected
+    except OSError:
+        return False
+
+
+def _lynis_git_checkout_owned():
+    """Never grant Git actions to an arbitrary directory with a .git folder."""
+    git_dir = "/opt/lynis"
+    git_cmd = git_dir + "/lynis"
+    if (os.path.islink(git_dir) or os.path.islink(git_dir + "/.git")
+            or os.path.islink(git_cmd) or not os.path.isdir(git_dir + "/.git")
+            or not os.path.isfile(git_cmd) or not os.access(git_cmd, os.X_OK)):
+        return False
+    try:
+        remote = subprocess.run(
+            ["git", "-C", git_dir, "remote", "get-url", "origin"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    if remote.returncode != 0 or remote.stdout.strip() not in {
+        "https://github.com/CISOfy/lynis",
+        "https://github.com/CISOfy/lynis.git",
+        "git@github.com:CISOfy/lynis",
+        "git@github.com:CISOfy/lynis.git",
+    }:
+        return False
+    # Existing pre-marker installations need their exact legacy wrapper.
+    return _lynis_has_managed_marker() or _lynis_is_managed_wrapper()
 
 
 def _find_lynis_installation():
     """Return (executable, origin), distinguishing Git from external installs."""
-    git_dir = "/opt/lynis"
-    git_cmd = git_dir + "/lynis"
-    if (not os.path.islink(git_dir)
-            and os.path.isdir(git_dir + "/.git")
-            and os.path.isfile(git_cmd) and os.access(git_cmd, os.X_OK)):
+    git_cmd = "/opt/lynis/lynis"
+    if _lynis_git_checkout_owned():
         if _lynis_is_managed_wrapper():
             return "/usr/local/bin/lynis", "git"
         return git_cmd, "git"
@@ -2618,7 +2654,7 @@ def uninstall_lynis():
     if source == "external":
         return (False, "Lynis is externally managed; use its package manager",
                 False, "external_installation")
-    if source != "git" or os.path.islink("/opt/lynis"):
+    if source != "git" or not _lynis_git_checkout_owned():
         return False, "No ProxMenux-managed Lynis installation found", False, "no_files"
 
     remove_wrapper = _lynis_is_managed_wrapper()

@@ -68,7 +68,7 @@ class LynisFeedbackProducer(unittest.TestCase):
                 orig_import = __import__
                 with patch('builtins.__import__', side_effect=lambda n, *a, **kw: fake_shutil if n == 'shutil' else orig_import(n, *a, **kw)):
                     fake_os.path.islink = lambda p: False
-                    result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os, '_find_lynis_installation': lambda: ('/opt/lynis/lynis', 'git'), '_lynis_is_managed_wrapper': lambda: True})()
+                    result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os, '_find_lynis_installation': lambda: ('/opt/lynis/lynis', 'git'), '_lynis_is_managed_wrapper': lambda: True, '_lynis_git_checkout_owned': lambda: True})()
                 self.assertEqual(removed, targets[:fail_at] if fail_at is not None else targets)
                 self.assertEqual(result[0], fail_at is None)
                 self.assertEqual(result[2], fail_at == 2)
