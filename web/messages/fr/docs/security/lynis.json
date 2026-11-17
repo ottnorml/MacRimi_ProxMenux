@@ -12,11 +12,11 @@
   },
   "intro": {
     "title": "Ce que ça fait",
-    "body": "Installe Lynis, l'auditeur de sécurité libre de CISOfy, depuis son dépôt GitHub dans <code>/opt/lynis</code> et crée un script de lancement dans <code>/usr/local/bin/lynis</code> pour le rendre accessible dans <code>PATH</code>. Une installation existante ouvre un menu d'audit, mise à jour, réinstallation ou suppression."
+    "body": "Installe Lynis, l'auditeur de sécurité libre de CISOfy, depuis son dépôt GitHub dans <code>/opt/lynis</code> et crée un script de lancement dans <code>/usr/local/bin/lynis</code> pour le rendre accessible dans <code>PATH</code>. Une installation existante ouvre un menu d'audit, mise à jour, réinstallation ou suppression. Les installations Lynis gérées par paquets sont détectées et peuvent être auditées, mais les actions Git de mise à jour et suppression sont indisponibles."
   },
   "manageMenu": {
     "heading": "Menu de gestion (après installation)",
-    "intro": "Une fois que Lynis est installé, chaque invocation subséquente ouvre le menu de gestion au lieu de relancer l'installateur. De là vous lancez un audit, mise à jour via git pull, réinstaller ou désinstaller:",
+    "intro": "Les actions dépendent de l'origine : une installation Git ProxMenux permet audit, mise à jour, réinstallation et suppression ; une installation externe permet uniquement l'audit.",
     "imageAlt": "Lynis menu de gestion avec audit, mise à jour, réinstaller et supprimer les options"
   },
   "whyUpstream": {
@@ -35,7 +35,7 @@
       },
       {
         "sourceRich": "<strong>Debian apt</strong>",
-        "path": "/usr/bin/lynis",
+        "path": "/usr/sbin/lynis",
         "update": "apt upgrade",
         "fresh": "Souvent mois / années de retard"
       }
@@ -53,13 +53,13 @@
   },
   "detection": {
     "heading": "Voies de détection",
-    "intro": "Avant d'afficher le menu, le script vérifie trois emplacements pour déterminer si Lynis est déjà présent :",
+    "intro": "Le programme vérifie les emplacements Git et des paquets connus, ainsi que les exécutables présents dans PATH. Principaux exemples :",
     "items": [
       "<code>/usr/local/bin/lynis</code> — enveloppe installée par ProxMenux",
       "<code>/opt/lynis/lynis</code> — chemin direct (au cas où l'emballage serait enlevé)",
-      "<code>/usr/bin/lynis</code> — version apt-installée, si l'utilisateur l'a installé de cette façon précédemment"
+      "<code>/usr/sbin/lynis</code> — version apt-installée, si l'utilisateur l'a installé de cette façon précédemment"
     ],
-    "outro": "Si un de ces chemins existe, le menu de gestion s'ouvre. Le script ne désinstalle <strong>pas</strong> un Lynis installé par apt, uniquement celui qu'il gère dans <code>/opt/lynis</code> et son lanceur."
+    "outro": "Une installation Git ProxMenux vérifiée permet l'audit, la mise à jour, la réinstallation et la suppression. Les installations externes ou gérées par paquets ne permettent que l'audit ; leur gestion passe par le gestionnaire de paquets."
   },
   "audit": {
     "heading": "Exécuter un audit",
@@ -99,7 +99,7 @@
   },
   "update": {
     "heading": "Mettre à jour Lynis",
-    "body": "Dans le menu, <strong>Mettre Lynis à jour vers la dernière version</strong> exécute <code>git pull --quiet</code> dans <code>/opt/lynis</code>. Si le répertoire n'est pas une copie de travail Git, par exemple après une copie manuelle des fichiers, le script réinstalle entièrement."
+    "body": "Pour un dépôt Git ProxMenux vérifié, <strong>Mettre Lynis à jour</strong> exécute <code>git pull --quiet</code> dans <code>/opt/lynis</code>. Les installations externes sont mises à jour via leur gestionnaire de paquets et ne sont pas remplacées par Git."
   },
   "reinstall": {
     "heading": "Réinstaller / désinstaller",
@@ -112,7 +112,7 @@
       },
       {
         "actionRich": "<strong>Supprimer</strong>",
-        "whatRich": "Supprime <code>/opt/lynis</code> et <code>/usr/local/bin/lynis</code>. Conserve les journaux <code>/var/log/lynis*</code> comme historique des audits. Un Lynis installé par apt dans <code>/usr/bin/lynis</code> reste intact."
+        "whatRich": "Supprime le dépôt Git ProxMenux dans <code>/opt/lynis</code> et son lanceur vérifié dans <code>/usr/local/bin/lynis</code>. Les historiques <code>/var/log/lynis*</code> sont conservés. Lynis géré par paquets dans <code>/usr/sbin/lynis</code> n'est jamais supprimé."
       }
     ]
   },
@@ -127,7 +127,7 @@
     "cloneBody": "L'hôte a besoin d'un accès réseau et DNS pour atteindre <code>github.com</code>. Depuis une console : <code>curl -sI https://github.com</code> et <code>git ls-remote https://github.com/CISOfy/lynis.git</code> révèlent l'erreur réelle (DNS, TLS, proxy, repo URL). Si un proxy est requis, définissez <code>https_proxy</code> dans l'environnement avant de ré-exécuter le menu.",
     "notFoundTitle": "lynis: commande introuvable après installation",
     "notFoundIntro": "Le lanceur <code>/usr/local/bin/lynis</code> n'a pas été créé ou a été supprimé. La solution la plus rapide est de réinstaller depuis le menu. Correction manuelle :",
-    "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
+    "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "L'audit affiche \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "Le démon SSH permet trop de tentatives d'auth par connexion. Soit installer <link>Fail2Ban</link> à partir de ProxMenux (qui définit <code>MaxAuthTries=3</code> automatiquement) soit éditer <code>/etc/ssh/sshd_config</code> à la main:",
     "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",

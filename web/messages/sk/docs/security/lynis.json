@@ -12,11 +12,11 @@
   },
   "intro": {
     "title": "Čo to robí?",
-    "body": "Nainštaluje Lynis, bezpečnostný audítor s otvoreným zdrojovým kódom od CISOfy, z jeho repozitára GitHub do <code>/opt/lynis</code> a vytvorí spúšťací skript <code>/usr/local/bin/lynis</code>, aby bol dostupný cez <code>PATH</code>. Ak rozpozná existujúcu inštaláciu, zobrazí menu auditu, aktualizácie, preinštalovania alebo odstránenia."
+    "body": "Nainštaluje Lynis, bezpečnostný audítor s otvoreným zdrojovým kódom od CISOfy, z jeho repozitára GitHub do <code>/opt/lynis</code> a vytvorí spúšťací skript <code>/usr/local/bin/lynis</code>, aby bol dostupný cez <code>PATH</code>. Ak rozpozná existujúcu inštaláciu, zobrazí menu auditu, aktualizácie, preinštalovania alebo odstránenia. Balíkovo spravované inštalácie Lynis sa rozpoznajú a umožňujú audit, ale Git aktualizácia a odstránenie pre ne nie sú dostupné."
   },
   "manageMenu": {
     "heading": "Menu správy (po inštalácii)",
-    "intro": "Keď je Lynis nainštalovaný, každé následné vyvolanie otvorí menu správy namiesto opätovného spustenia inštalátora. Odtiaľ spustíte audit, aktualizáciu prostredníctvom git pull, preinštalovať alebo odinštalovať:",
+    "intro": "Dostupné akcie závisia od pôvodu: Git inštalácie ProxMenux umožňujú audit, aktualizáciu, preinštalovanie a odstránenie; externé iba audit.",
     "imageAlt": "Lynis management menu s auditom, aktualizácia, preinštalovať a odstrániť možnosti"
   },
   "whyUpstream": {
@@ -35,7 +35,7 @@
       },
       {
         "sourceRich": "<strong>Debian apt</strong>",
-        "path": "/usr/bin/lynis",
+        "path": "/usr/sbin/lynis",
         "update": "apt upgrade",
         "fresh": "Často mesiace / roky pozadu"
       }
@@ -53,13 +53,13 @@
   },
   "detection": {
     "heading": "Zisťovacie cesty",
-    "intro": "Pred zobrazením menu skript kontroluje tri miesta, aby rozhodol, či je Lynis už prítomný:",
+    "intro": "Inštalátor kontroluje známe cesty Git a balíkov aj spustiteľné súbory v PATH. Hlavné príklady:",
     "items": [
       "<code>/usr/local/bin/lynis</code> Wrapper nainštalovaný ProxMenux",
       "<code>/opt/lynis/lynis</code> — priama cesta, ak bol spúšťací skript odstránený",
-      "<code>/usr/bin/lynis</code> — verzia nainštalovaná cez apt, ak ju používateľ nainštaloval týmto spôsobom"
+      "<code>/usr/sbin/lynis</code> — verzia nainštalovaná cez apt, ak ju používateľ nainštaloval týmto spôsobom"
     ],
-    "outro": "Ak sa nájde niektorá z ciest, otvorí sa menu správy. Skript <strong>neodinštaluje</strong> Lynis nainštalovaný cez apt; odstráni iba vlastnú inštaláciu v <code>/opt/lynis</code> a jej spúšťací skript."
+    "outro": "Overená Git inštalácia ProxMenux ponúka audit, aktualizáciu, preinštalovanie a odstránenie. Externé inštalácie a inštalácie cez balíky umožňujú iba audit; aktualizácie a odinštalovanie spravuje správca balíkov."
   },
   "audit": {
     "heading": "Spustiť audit",
@@ -99,7 +99,7 @@
   },
   "update": {
     "heading": "Aktualizácia Lynis",
-    "body": "V menu možnosť <strong>Aktualizovať Lynis na najnovšiu verziu</strong> spustí <code>git pull --quiet</code> v <code>/opt/lynis</code>. Ak adresár existuje, ale nie je pracovnou kópiou Git, napríklad po ručnom kopírovaní súborov, skript vykoná úplnú preinštaláciu."
+    "body": "Pre overený Git checkout ProxMenux príkaz <strong>Aktualizovať Lynis</strong> spustí <code>git pull --quiet</code> v <code>/opt/lynis</code>. Externé inštalácie sa aktualizujú cez správcu balíkov a ProxMenux ich nenahrádza Git verziou."
   },
   "reinstall": {
     "heading": "Preinštalovať/odinštalovať",
@@ -112,7 +112,7 @@
       },
       {
         "actionRich": "<strong>Odstrániť</strong>",
-        "whatRich": "Odstráni <code>/opt/lynis</code> a <code>/usr/local/bin/lynis</code>. Záznamy na <code>/var/log/lynis*</code> sú vedené (sú audit histórie). Apt-inštalovaný Lynis na <code>/usr/bin/lynis</code> zostáva nedotknutý."
+        "whatRich": "Odstráni Git checkout ProxMenux z <code>/opt/lynis</code> a overený spúšťací skript z <code>/usr/local/bin/lynis</code>. Auditné logy <code>/var/log/lynis*</code> zostanú zachované. Balíkový Lynis v <code>/usr/sbin/lynis</code> sa neodstráni."
       }
     ]
   },
@@ -127,7 +127,7 @@
     "cloneBody": "Hostiteľ potrebuje prístup k sieti a DNS dosiahnuť <code>github.com</code>. Z konzoly: <code>curl -sI https://github.com</code> a <code>git ls-remote https://github.com/CISOfy/lynis.git</code> odhalí skutočnú chybu (DNS, TLS, proxy, repo URL). Ak sa vyžaduje proxy, nastavte <code>https_proxy</code> v prostredí pred opätovným spustením menu.",
     "notFoundTitle": "lynis: príkaz nenájdený po inštalácii",
     "notFoundIntro": "Obal na <code>/usr/local/bin/lynis</code> buď nebol vytvorený, alebo bol odstránený. Najrýchlejšia oprava: preinštalovať z menu. Ručné nastavenie:",
-    "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
+    "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "Audit zobrazuje \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "Démon SSH umožňuje príliš veľa auth pokusov na pripojenie. Buď nainštalujte <link>Fail2Ban</link> z ProxMenux (ktorý nastaví <code>MaxAuthTries=3</code>), alebo editujte <code>/etc/ssh/sshd_config</code> ručne:",
     "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
