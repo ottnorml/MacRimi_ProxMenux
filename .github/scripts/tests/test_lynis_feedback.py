@@ -24,7 +24,7 @@ class LynisFeedbackProducer(unittest.TestCase):
 
     def test_uninstall_nothing_to_remove_is_not_reported_as_uninstalled(self):
         fake_os = SimpleNamespace(path=SimpleNamespace(exists=lambda p: False, join=lambda *p: '/'.join(p)), remove=lambda p: self.fail(p))
-        result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os})()
+        result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os, '_find_lynis_installation': lambda: (None, 'none')})()
         self.assertFalse(result[0])
         self.assertEqual(result[3], 'no_files')
         manager = SimpleNamespace(uninstall_lynis=lambda: result)
@@ -67,7 +67,8 @@ class LynisFeedbackProducer(unittest.TestCase):
                 fake_shutil = SimpleNamespace(rmtree=remove)
                 orig_import = __import__
                 with patch('builtins.__import__', side_effect=lambda n, *a, **kw: fake_shutil if n == 'shutil' else orig_import(n, *a, **kw)):
-                    result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os})()
+                    fake_os.path.islink = lambda p: False
+                    result = extracted('AppImage/scripts/security_manager.py', 'uninstall_lynis', {'os': fake_os, '_find_lynis_installation': lambda: ('/opt/lynis/lynis', 'git'), '_lynis_is_managed_wrapper': lambda: True})()
                 self.assertEqual(removed, targets[:fail_at] if fail_at is not None else targets)
                 self.assertEqual(result[0], fail_at is None)
                 self.assertEqual(result[2], fail_at == 2)

@@ -8,6 +8,7 @@ Handles Proxmox firewall status, rules, and security tool detection.
 import os
 import json
 import subprocess
+import shutil
 import re
 import fcntl
 import threading
@@ -1569,12 +1570,44 @@ def _detect_fail2ban():
     return info
 
 
-def _find_lynis_cmd():
-    """Find the lynis binary path"""
-    for path in ["/usr/local/bin/lynis", "/opt/lynis/lynis", "/usr/bin/lynis"]:
+def _lynis_is_managed_wrapper():
+    """Recognize the ProxMenux wrapper, never a foreign symlink."""
+    path = "/usr/local/bin/lynis"
+    if os.path.islink(path) or not os.path.isfile(path) or not os.access(path, os.X_OK):
+        return False
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return (handle.readline().strip() == "#!/bin/bash"
+                    and handle.readline().strip() == 'cd /opt/lynis && ./lynis "$@"')
+    except (OSError, UnicodeError):
+        return False
+
+
+def _find_lynis_installation():
+    """Return (executable, origin), distinguishing Git from external installs."""
+    git_dir = "/opt/lynis"
+    git_cmd = git_dir + "/lynis"
+    if (not os.path.islink(git_dir)
+            and os.path.isdir(git_dir + "/.git")
+            and os.path.isfile(git_cmd) and os.access(git_cmd, os.X_OK)):
+        if _lynis_is_managed_wrapper():
+            return "/usr/local/bin/lynis", "git"
+        return git_cmd, "git"
+
+    for path in ("/usr/sbin/lynis", "/usr/bin/lynis",
+                 "/usr/local/bin/lynis", "/opt/lynis/lynis"):
         if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
-    return None
+            return path, "external"
+
+    path = shutil.which("lynis")
+    if path and os.path.isabs(path) and os.path.isfile(path) and os.access(path, os.X_OK):
+        return path, "external"
+    return None, "none"
+
+
+def _find_lynis_cmd():
+    """Return the selected executable for existing audit callers."""
+    return _find_lynis_installation()[0]
 
 
 def _detect_lynis():
@@ -1582,11 +1615,12 @@ def _detect_lynis():
     info = {
         "installed": False,
         "version": "",
+        "source": "none",
         "last_scan": None,
         "hardening_index": None,
     }
 
-    lynis_cmd = _find_lynis_cmd()
+    lynis_cmd, info["source"] = _find_lynis_installation()
 
     if lynis_cmd:
         info["installed"] = True
@@ -2580,16 +2614,24 @@ def uninstall_lynis():
     Returns (success, message, partial, outcome). Partial records completed removals only.
     """
     removed = []
+    lynis_cmd, source = _find_lynis_installation()
+    if source == "external":
+        return (False, "Lynis is externally managed; use its package manager",
+                False, "external_installation")
+    if source != "git" or os.path.islink("/opt/lynis"):
+        return False, "No ProxMenux-managed Lynis installation found", False, "no_files"
+
+    remove_wrapper = _lynis_is_managed_wrapper()
     try:
         import shutil
-        
+
         # Remove installation directory
         if os.path.exists("/opt/lynis"):
             shutil.rmtree("/opt/lynis")
             removed.append("/opt/lynis")
         
         # Remove wrapper script
-        if os.path.exists("/usr/local/bin/lynis"):
+        if remove_wrapper and os.path.exists("/usr/local/bin/lynis"):
             os.remove("/usr/local/bin/lynis")
             removed.append("/usr/local/bin/lynis")
         

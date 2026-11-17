@@ -177,7 +177,7 @@ export function Security({ hostType = "pve" }: { hostType?: "pve" | "pbs" } = {}
     installed: boolean; active: boolean; version: string; jails: string[]; banned_ips_count: number
   } | null>(null)
   const [lynisInfo, setLynisInfo] = useState<{
-    installed: boolean; version: string; last_scan: string | null; hardening_index: number | null
+    installed: boolean; version: string; source?: "git" | "external" | "none"; last_scan: string | null; hardening_index: number | null
   } | null>(null)
   const [showFail2banInstaller, setShowFail2banInstaller] = useState(false)
   const [showLynisInstaller, setShowLynisInstaller] = useState(false)
@@ -4078,7 +4078,7 @@ ${(report.sections && report.sections.length > 0) ? `
               <Search className="h-5 w-5 text-cyan-500" />
               <CardTitle>{st("lynis.title")}</CardTitle>
             </div>
-            {lynisInfo?.installed && (
+            {lynisInfo?.installed && lynisInfo.source === "git" && (
               <Button
                 variant="outline"
                 size="sm"
