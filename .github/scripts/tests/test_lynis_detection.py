@@ -105,5 +105,68 @@ class LynisDetection(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), "true|external|3.1.7")
 
 
+    def test_package_symlink_is_not_a_safe_install_target(self):
+        source = BASH.read_text()
+        parts = []
+        for name in ("lynis_is_managed_wrapper", "lynis_install_target_safe"):
+            match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
+                              re.MULTILINE | re.DOTALL)
+            self.assertIsNotNone(match, name)
+            parts.append(match.group())
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "opt/lynis/.git").mkdir(parents=True)
+            package = root / "usr/sbin/lynis"
+            package.parent.mkdir(parents=True)
+            package.write_text("#!/bin/sh\necho package\n")
+            package.chmod(0o755)
+            wrapper = root / "usr/local/bin/lynis"
+            wrapper.parent.mkdir(parents=True)
+            wrapper.symlink_to(package)
+            script = "\n".join(parts)
+            for path in ("/usr/local/bin/lynis", "/opt/lynis"):
+                script = script.replace(path, str(root / path.lstrip("/")))
+            run = subprocess.run(["bash", "-c", script + "\nlynis_install_target_safe\n"],
+                                 capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(run.returncode, 0, "A package symlink must never be replaced")
+            wrapper.unlink()
+            wrapper.write_text("#!/bin/bash\nexec /usr/sbin/lynis \"$@\"\n")
+            wrapper.chmod(0o755)
+            run = subprocess.run(["bash", "-c", script + "\nlynis_install_target_safe\n"],
+                                 capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(run.returncode, 0, "A foreign wrapper must not be replaced")
+
+    def test_git_detection_runs_without_wrapper(self):
+        source = BASH.read_text()
+        parts = []
+        for name in ("lynis_git_checkout", "lynis_is_managed_wrapper", "lynis_run", "detect_lynis"):
+            match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
+                              re.MULTILINE | re.DOTALL)
+            self.assertIsNotNone(match, name)
+            parts.append(match.group())
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            git = root / "opt/lynis"
+            (git / ".git").mkdir(parents=True)
+            binary = git / "lynis"
+            binary.write_text("#!/bin/sh\necho git-version\n")
+            binary.chmod(0o755)
+            pkg = root / "usr/sbin/lynis"
+            pkg.parent.mkdir(parents=True)
+            pkg.write_text("#!/bin/sh\necho package-version\n")
+            pkg.chmod(0o755)
+            script = "\n".join(parts)
+            for path in ("/usr/sbin/lynis", "/usr/bin/lynis",
+                         "/usr/local/bin/lynis", "/opt/lynis"):
+                script = script.replace(path, str(root / path.lstrip("/")))
+            script += '\ndetect_lynis; printf "%s|%s|%s\\n" "$LYNIS_INSTALLED" "$LYNIS_SOURCE" "$LYNIS_VERSION"\n'
+            result = subprocess.run(["bash", "-c", script], capture_output=True,
+                                    text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), "true|git|git-version")
+
+
+
+
 if __name__ == "__main__":
     unittest.main()

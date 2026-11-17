@@ -232,7 +232,7 @@ update_lynis() {
     pmx_record_execution "update Lynis installation in /opt/lynis" "git pull --quiet"
     if git pull --quiet >/dev/null 2>&1; then
       local version
-      version=$(/usr/local/bin/lynis show version 2>/dev/null)
+      version=$(lynis_run show version 2>/dev/null)
       update_component_status "lynis" "installed" "$version" "security" '{}'
       msg_ok "$(translate "Lynis updated to version:") $version"
     else
