@@ -2,7 +2,7 @@ name: Lynis detection and ownership regressions
 
 on:
   push:
-    branches: [main, bugfix/675-lynis-detection]
+    branches: [main, develop, bugfix/675-lynis-detection]
     paths:
       - '.github/workflows/test-lynis.yml'
       - '.github/scripts/tests/test_lynis*.py'
@@ -11,6 +11,7 @@ on:
       - 'AppImage/components/security.tsx'
       - 'AppImage/scripts/flask_security_routes.py'
       - 'web/messages/*/docs/security/lynis.json'
+      - 'lang/*.json'
   pull_request:
     paths:
       - '.github/workflows/test-lynis.yml'
@@ -20,6 +21,7 @@ on:
       - 'AppImage/components/security.tsx'
       - 'AppImage/scripts/flask_security_routes.py'
       - 'web/messages/*/docs/security/lynis.json'
+      - 'lang/*.json'
   workflow_dispatch:
 
 permissions:
