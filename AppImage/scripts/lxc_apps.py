@@ -45,6 +45,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+from pathlib import Path
 from typing import Any, Optional
 import local_app_icons
 
@@ -595,8 +596,14 @@ def helper_update_selected(vmid, slug: str, targets=None) -> bool:
     return any(f"app:{app.get('id')}" in targets for app in matching)
 
 
-def _write_sidecar(vmid, data: dict) -> bool:
+def _write_sidecar(vmid, data: dict, copies: bool = False) -> bool:
+    """`copies`: the registrations changed, so the copies that travel with
+    the container are written too. Results of checks never are."""
     _migrate_update_methods(data)
+    # The registrations of a container keep one identity wherever they go,
+    # so the copy a container carries is recognised after a restore.
+    if not data.get("watch_id"):
+        data["watch_id"] = uuid.uuid4().hex
     _ensure_dir()
     path = _sidecar_path(vmid)
     tmp = f"{path}.tmp.{os.getpid()}"
@@ -609,6 +616,8 @@ def _write_sidecar(vmid, data: dict) -> bool:
                 os.replace(tmp, path)
                 snapshot = _publish_sidecar_snapshot(path, data, _sidecar_signature(os.stat(path)))
                 data['_revision'] = snapshot['_revision']
+        if copies:
+            _sync_copies(vmid, data)
         return True
     except (OSError, local_app_icons.IconError) as e:
         print(f"[ProxMenux] lxc_apps: could not write sidecar {path}: {e}")
@@ -621,6 +630,167 @@ def _write_sidecar(vmid, data: dict) -> bool:
 
 def _new_app_id() -> str:
     return uuid.uuid4().hex[:12]
+
+
+# ── Copies that travel with the container (app_watch_copies) ─────────
+_APP_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,40}$")
+_COPY_RECONCILE_SECONDS = 300
+
+
+def _sync_copies(vmid, data: dict) -> None:
+    try:
+        import app_watch_copies
+        app_watch_copies.write(vmid, data)
+    except Exception as e:  # The record on the node is what counts.
+        print(f"[ProxMenux] lxc_apps: copies of CT {vmid} not written: {e}")
+
+
+def _remove_copies(vmid) -> None:
+    try:
+        import app_watch_copies
+        app_watch_copies.remove(vmid)
+    except Exception as e:
+        print(f"[ProxMenux] lxc_apps: copies of CT {vmid} not removed: {e}")
+
+
+def _adopt_copy(vmid, source: dict, origin: str, machine) -> dict:
+    """The registrations a container brought, validated as if the user had
+    entered them here. An app that does not validate is left out."""
+    apps = []
+    for app in source.get("apps") or []:
+        if not isinstance(app, dict):
+            continue
+        entered = {k: v for k, v in app.items() if k not in ("id", "state", "created_at", "updated_at")}
+        ok, cfg = validate_config(entered, vmid=vmid)
+        if not ok and "logo_url" in entered:
+            # A logo cached for another VMID is not this container's.
+            entered.pop("logo_url")
+            ok, cfg = validate_config(entered, vmid=vmid)
+        if not ok:
+            print(f"[ProxMenux] lxc_apps: CT {vmid}: an app of its copy was left out: {cfg}")
+            continue
+        app_id = app.get("id") if isinstance(app.get("id"), str) and _APP_ID_RE.match(app["id"]) else _new_app_id()
+        apps.append({"id": app_id, **cfg, "state": _empty_state(),
+                     "created_at": app.get("created_at") if isinstance(app.get("created_at"), str) else _now_iso()})
+    slugs = [s for s in source.get("dismissed_slugs") or [] if isinstance(s, str) and _HELPER_SLUG_RE.match(s)]
+    sidecar = {"vmid": int(vmid), "apps": apps, "created_at": _now_iso(), "updated_at": _now_iso(),
+               "watch_id": source["watch_id"], "identity": {"machine_id": machine} if machine else {},
+               "dismissed_slugs": slugs}
+    try:
+        import access_log
+        access_log.record("app_watch.adopted", None, f"CT {int(vmid)}", {"from": origin, "apps": len(apps)})
+    except Exception:
+        pass
+    return sidecar
+
+
+def reconcile_copies(vmid) -> Optional[str]:
+    """Bring the registrations of a container in line with the copies.
+
+    A running container that carries registrations other than those of its
+    VMID (restored under another VMID or in another order) gets its own
+    back. A container without a record on this node (migrated here) gets
+    the one of the cluster. A container without a copy whose machine ID is
+    not the one recorded is marked: its registrations may belong to another
+    container. Returns what was done, or None."""
+    import app_watch_copies as copies
+    pid = copies.running_pid(vmid)
+    machine = copies.machine_id(vmid, pid) if pid else None
+    with _cache_lock:
+        local = _read_sidecar(vmid)
+        carried = copies.read_container(vmid, pid) if pid else None
+        if carried and (not local or local.get("watch_id") != carried["watch_id"]):
+            source, origin = carried, "container"
+        elif not local and not carried:
+            cluster = copies.read_cluster(vmid)
+            known = (cluster or {}).get("identity", {}).get("machine_id") if isinstance(cluster, dict) else None
+            # Only the same container: a new one with a reused VMID is not.
+            source, origin = (cluster, "cluster") if cluster and machine and known == machine else (None, None)
+        else:
+            source, origin = None, None
+        if source:
+            sidecar = _adopt_copy(vmid, source, origin, machine)
+            copies.forget(vmid)
+            _write_sidecar(vmid, sidecar, copies=True)
+            return "adopted-" + origin
+        if not local or not pid:
+            return None
+        recorded = (local.get("identity") or {}).get("machine_id")
+        if not carried and recorded and machine and recorded != machine:
+            if not local.get("registration_mismatch"):
+                local["registration_mismatch"] = True
+                _write_sidecar(vmid, local, copies=False)
+            return "mismatch"
+        changed = False
+        if machine and recorded != machine:
+            local["identity"] = {"machine_id": machine}
+            changed = True
+        if local.pop("registration_mismatch", None):
+            changed = True
+        if not carried or copies.digest(copies.payload(vmid, local)) != copies.digest(carried):
+            copies.forget(vmid)
+            changed = True
+        if changed:
+            _write_sidecar(vmid, local, copies=True)
+            return "copied"
+    return None
+
+
+def _local_containers() -> list:
+    try:
+        names = os.listdir("/etc/pve/local/lxc")
+    except OSError:
+        return []
+    return sorted(int(n[:-5]) for n in names if n.endswith(".conf") and n[:-5].isdigit())
+
+
+def _forget_removed_containers() -> None:
+    """The cluster copy of a VMID that no node has any more."""
+    try:
+        import app_watch_copies as copies
+        if not os.path.ismount("/etc/pve") or not copies.CLUSTER.is_dir():
+            return
+        existing = {p.stem for p in Path("/etc/pve/nodes").glob("*/lxc/*.conf")}
+        for path in copies.CLUSTER.glob("*.json"):
+            if path.stem.isdigit() and path.stem not in existing:
+                copies.remove_cluster(int(path.stem))
+    except Exception as e:
+        print(f"[ProxMenux] lxc_apps: cluster copies not tidied: {e}")
+
+
+def _copy_reconciler_loop() -> None:
+    time.sleep(60)
+    while True:
+        for vmid in _local_containers():
+            try:
+                reconcile_copies(vmid)
+            except Exception as e:
+                print(f"[ProxMenux] lxc_apps: reconcile CT {vmid} failed: {e}")
+        _forget_removed_containers()
+        time.sleep(_COPY_RECONCILE_SECONDS)
+
+
+_copy_reconciler_started = False
+
+
+def reconcile_after_start(vmid, delay: int = 15) -> None:
+    """A container that starts may be one just restored: its own copy is
+    read as soon as it is up, not at the next pass."""
+    def later():
+        time.sleep(delay)
+        try:
+            reconcile_copies(vmid)
+        except Exception as e:
+            print(f"[ProxMenux] lxc_apps: reconcile CT {vmid} after start failed: {e}")
+    threading.Thread(target=later, daemon=True, name=f"app-watch-copies-{int(vmid)}").start()
+
+
+def start_copy_reconciler() -> None:
+    global _copy_reconciler_started
+    if _copy_reconciler_started:
+        return
+    _copy_reconciler_started = True
+    threading.Thread(target=_copy_reconciler_loop, daemon=True, name="app-watch-copies").start()
 
 
 # ── Validation ─────────────────────────────────────────────────────
@@ -3399,7 +3569,7 @@ def set_dismissed_slug(vmid, slug: str, dismissed: bool) -> tuple[bool, Any]:
             current = [s for s in current if s != slug]
         sidecar["dismissed_slugs"] = current
         sidecar["updated_at"] = _now_iso()
-        if not _write_sidecar(vmid, sidecar):
+        if not _write_sidecar(vmid, sidecar, copies=True):
             return False, "could not persist sidecar (permission?)"
     return True, _read_sidecar(vmid)
 
@@ -3429,7 +3599,7 @@ def add_app(vmid, payload: dict, notify: bool = True) -> tuple[bool, Any]:
             "created_at": _now_iso(),
         })
         sidecar["updated_at"] = _now_iso()
-        if not _write_sidecar(vmid, sidecar):
+        if not _write_sidecar(vmid, sidecar, copies=True):
             return False, "could not persist sidecar (permission?)"
     # Kick a first check so the UI shows real numbers immediately
     check_app(vmid, new_id, force=True, notify=notify)
@@ -3455,7 +3625,7 @@ def update_app(vmid, app_id: str, payload: dict) -> tuple[bool, Any]:
             "id": app_id, **cfg, "state": state, "created_at": created,
         }
         sidecar["updated_at"] = _now_iso()
-        if not _write_sidecar(vmid, sidecar):
+        if not _write_sidecar(vmid, sidecar, copies=True):
             return False, "could not persist sidecar"
     check_app(vmid, app_id, force=True)
     return True, _read_sidecar(vmid)
@@ -3515,7 +3685,7 @@ def delete_app(vmid, app_id: str) -> bool:
             except OSError:
                 pass
         if before != len(sidecar["apps"]):
-            return _write_sidecar(vmid, sidecar)
+            return _write_sidecar(vmid, sidecar, copies=True)
         return True
 
 
@@ -3524,6 +3694,7 @@ def forget_guest(vmid) -> None:
     included, so a new guest that reuses the VMID starts with nothing."""
     key = str(int(vmid))
     path = _sidecar_path(vmid)
+    _remove_copies(vmid)
     with _cache_lock:
         try:
             os.unlink(path)
@@ -3566,6 +3737,7 @@ def delete_all(vmid) -> bool:
     sidecar = _read_sidecar(vmid) or {}
     if any(a.get("installed_via") == "oci_image" for a in sidecar.get("apps") or []):
         _dismiss_oci_registration(vmid)
+    _remove_copies(vmid)
     try:
         os.unlink(_sidecar_path(vmid))
         return True
@@ -5021,7 +5193,8 @@ def get_active_apps() -> dict:
         if not apps:
             continue
         out[str(vmid)] = [
-            {**_summarise_app(a), 'state_revision': sidecar.get('_revision')}
+            {**_summarise_app(a), 'state_revision': sidecar.get('_revision'),
+             'registration_mismatch': bool(sidecar.get('registration_mismatch'))}
             for a in apps
         ]
     return out
@@ -5565,7 +5738,46 @@ def _helper_slug_meta(vmid) -> Optional[dict]:
 
 _OCI_INSTANCE_ROOT = "/usr/local/share/proxmenux/oci/instances"
 _OCI_CATALOG_INDEX = "/usr/local/share/proxmenux/oci/engine/catalog/index.json"
+_OCI_ENGINE_DIR = "/usr/local/share/proxmenux/oci/engine"
 _oci_catalog_cache: tuple[float, dict, dict] | None = None
+_oci_catalog_dir_cache: tuple[float, str, str] | None = None
+
+
+def oci_catalog_dir() -> str:
+    """The catalog the OCI engine is using now.
+
+    A catalog refresh keeps the new catalog in a snapshot of its own and
+    leaves the one shipped with the engine untouched, so the Monitor asks the
+    engine which one is active instead of reading a fixed path. The engine
+    answers in a separate process: importing its package would configure the
+    registry accounts inside the Monitor. The shipped catalog is the fallback.
+    """
+    global _oci_catalog_dir_cache
+    shipped = os.path.dirname(_OCI_CATALOG_INDEX)
+    now = time.time()
+    if (_oci_catalog_dir_cache and _oci_catalog_dir_cache[1] == shipped
+            and now - _oci_catalog_dir_cache[0] < 60):
+        return _oci_catalog_dir_cache[2]
+    active = shipped
+    if os.path.isdir(os.path.join(_OCI_ENGINE_DIR, "src")):
+        try:
+            result = subprocess.run(
+                [sys.executable, "-c",
+                 "import sys; sys.path.insert(0, sys.argv[1] + '/src'); "
+                 "from proxmenux_oci.catalog_refresh import current_catalog; "
+                 "print(current_catalog(sys.argv[1]))", _OCI_ENGINE_DIR],
+                capture_output=True, text=True, timeout=15)
+            answer = result.stdout.strip()
+            if result.returncode == 0 and os.path.isfile(os.path.join(answer, "index.json")):
+                active = answer
+        except (OSError, subprocess.SubprocessError):
+            pass
+    _oci_catalog_dir_cache = (now, shipped, active)
+    return active
+
+
+def _oci_catalog_index_path() -> str:
+    return os.path.join(oci_catalog_dir(), "index.json")
 
 
 def _oci_catalog_icons() -> dict:
@@ -5590,7 +5802,7 @@ def _oci_catalog_entries() -> tuple[dict, dict]:
     icons: dict = {}
     templates: dict = {}
     try:
-        with open(_OCI_CATALOG_INDEX, encoding="utf-8") as handle:
+        with open(_oci_catalog_index_path(), encoding="utf-8") as handle:
             for item in (json.load(handle) or {}).get("applications", []):
                 item = item or {}
                 icon = item.get("icon")
@@ -5610,6 +5822,48 @@ def _oci_catalog_entries() -> tuple[dict, dict]:
     return icons, templates
 
 
+_oci_icon_themes_cache: tuple[float, dict] | None = None
+
+
+def oci_icon_themes() -> dict:
+    """The icon to draw on the dark theme, keyed by the icon it replaces.
+
+    The OCI catalog and the Community Scripts catalog mark the icons that are
+    a black mark on a transparent background: they take the light version of
+    their icon set, or "invert" when there is none. Keyed by URL, so an icon
+    saved with an installation or a link gets it as well.
+    """
+    global _oci_icon_themes_cache
+    now = time.time()
+    if _oci_icon_themes_cache and now - _oci_icon_themes_cache[0] < 600:
+        return _oci_icon_themes_cache[1]
+    themes: dict = {}
+    try:
+        with open(_oci_catalog_index_path(), encoding="utf-8") as handle:
+            for item in (json.load(handle) or {}).get("applications", []):
+                icon = (item or {}).get("icon")
+                dark = (item or {}).get("icon_dark")
+                if not (isinstance(icon, str) and icon.startswith("https://")):
+                    continue
+                if dark == "invert" or (isinstance(dark, str) and dark.startswith("https://")):
+                    themes[icon] = dark
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    try:
+        import managed_installs
+        for entry in (managed_installs._fetch_helpers_cache() or {}).values():
+            logo = (entry or {}).get("logo")
+            dark = (entry or {}).get("logo_dark")
+            if not (isinstance(logo, str) and logo.startswith("https://")):
+                continue
+            if dark == "invert" or (isinstance(dark, str) and dark.startswith("https://")):
+                themes.setdefault(logo, dark)
+    except Exception:
+        pass
+    _oci_icon_themes_cache = (now, themes)
+    return themes
+
+
 def _oci_catalog_first_run(template_id) -> dict:
     """The first_run contract of the current catalog template. An existing
     install keeps a copy from the day it was created; what the catalog added
@@ -5618,7 +5872,7 @@ def _oci_catalog_first_run(template_id) -> dict:
     if not template:
         return {}
     try:
-        with open(os.path.join(os.path.dirname(_OCI_CATALOG_INDEX), template), encoding="utf-8") as handle:
+        with open(os.path.join(oci_catalog_dir(), template), encoding="utf-8") as handle:
             first_run = (json.load(handle) or {}).get("first_run")
     except (OSError, ValueError, TypeError, AttributeError):
         return {}
@@ -5800,7 +6054,7 @@ def _register_oci_installation(vmid) -> bool:
             if logo:
                 for app in missing:
                     app["logo_url"] = logo
-                _write_sidecar(vmid, sidecar)
+                _write_sidecar(vmid, sidecar, copies=True)
             return False
     meta = _oci_instance_meta(vmid)
     if not meta or not meta.get("name") or not _NAME_RE.match(str(meta["name"])):

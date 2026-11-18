@@ -1,11 +1,11 @@
 {
   "version": 1,
   "repository": "MacRimi/ProxMenux",
-  "updatedAt": "2026-11-15T04:22:55.941Z",
+  "updatedAt": "2026-10-26T04:36:49.492Z",
   "backfilledAt": "2026-07-22T18:09:20.834Z",
   "totals": {
     "downloads": 0,
-    "clones": 85218
+    "clones": 59792
   },
   "assets": {},
   "traffic": {
@@ -345,86 +345,6 @@
       "2026-10-24": {
         "count": 900,
         "uniques": 316
-      },
-      "2026-10-25": {
-        "count": 1562,
-        "uniques": 357
-      },
-      "2026-10-26": {
-        "count": 928,
-        "uniques": 397
-      },
-      "2026-10-27": {
-        "count": 1876,
-        "uniques": 1119
-      },
-      "2026-10-28": {
-        "count": 1304,
-        "uniques": 737
-      },
-      "2026-10-29": {
-        "count": 1349,
-        "uniques": 650
-      },
-      "2026-10-30": {
-        "count": 1084,
-        "uniques": 580
-      },
-      "2026-10-31": {
-        "count": 753,
-        "uniques": 475
-      },
-      "2026-11-01": {
-        "count": 827,
-        "uniques": 479
-      },
-      "2026-11-02": {
-        "count": 1619,
-        "uniques": 975
-      },
-      "2026-11-03": {
-        "count": 1824,
-        "uniques": 914
-      },
-      "2026-11-04": {
-        "count": 1489,
-        "uniques": 702
-      },
-      "2026-11-05": {
-        "count": 1707,
-        "uniques": 932
-      },
-      "2026-11-06": {
-        "count": 1064,
-        "uniques": 613
-      },
-      "2026-11-07": {
-        "count": 1070,
-        "uniques": 530
-      },
-      "2026-11-08": {
-        "count": 1598,
-        "uniques": 529
-      },
-      "2026-11-09": {
-        "count": 937,
-        "uniques": 515
-      },
-      "2026-11-10": {
-        "count": 1127,
-        "uniques": 493
-      },
-      "2026-11-11": {
-        "count": 826,
-        "uniques": 413
-      },
-      "2026-11-12": {
-        "count": 967,
-        "uniques": 431
-      },
-      "2026-11-13": {
-        "count": 1515,
-        "uniques": 431
       }
     }
   },
@@ -4032,154 +3952,14 @@
       "stars": 3229,
       "forks": 175,
       "downloads": 0,
-      "clones": 61354
+      "clones": 59792
     },
     {
       "date": "2026-10-26",
       "stars": 3234,
       "forks": 175,
       "downloads": 0,
-      "clones": 62282
-    },
-    {
-      "date": "2026-10-27",
-      "stars": 3237,
-      "forks": 175,
-      "downloads": 0,
-      "clones": 64158
-    },
-    {
-      "date": "2026-10-28",
-      "stars": 3241,
-      "forks": 176,
-      "downloads": 0,
-      "clones": 65462
-    },
-    {
-      "date": "2026-10-29",
-      "stars": 3243,
-      "forks": 176,
-      "downloads": 0,
-      "clones": 66811
-    },
-    {
-      "date": "2026-10-30",
-      "stars": 3247,
-      "forks": 177,
-      "downloads": 0,
-      "clones": 67895
-    },
-    {
-      "date": "2026-10-31",
-      "stars": 3251,
-      "forks": 177,
-      "downloads": 0,
-      "clones": 68648
-    },
-    {
-      "date": "2026-11-01",
-      "stars": 3254,
-      "forks": 177,
-      "downloads": 0,
-      "clones": 69475
-    },
-    {
-      "date": "2026-11-02",
-      "stars": 3258,
-      "forks": 178,
-      "downloads": 0,
-      "clones": 71094
-    },
-    {
-      "date": "2026-11-03",
-      "stars": 3263,
-      "forks": 179,
-      "downloads": 0,
-      "clones": 72918
-    },
-    {
-      "date": "2026-11-04",
-      "stars": 3268,
-      "forks": 180,
-      "downloads": 0,
-      "clones": 74407
-    },
-    {
-      "date": "2026-11-05",
-      "stars": 3270,
-      "forks": 180,
-      "downloads": 0,
-      "clones": 76114
-    },
-    {
-      "date": "2026-11-06",
-      "stars": 3275,
-      "forks": 181,
-      "downloads": 0,
-      "clones": 77178
-    },
-    {
-      "date": "2026-11-07",
-      "stars": 3277,
-      "forks": 181,
-      "downloads": 0,
-      "clones": 78248
-    },
-    {
-      "date": "2026-11-08",
-      "stars": 3283,
-      "forks": 182,
-      "downloads": 0,
-      "clones": 79846
-    },
-    {
-      "date": "2026-11-09",
-      "stars": 3288,
-      "forks": 182,
-      "downloads": 0,
-      "clones": 80783
-    },
-    {
-      "date": "2026-11-10",
-      "stars": 3292,
-      "forks": 185,
-      "downloads": 0,
-      "clones": 81910
-    },
-    {
-      "date": "2026-11-11",
-      "stars": 3297,
-      "forks": 185,
-      "downloads": 0,
-      "clones": 82736
-    },
-    {
-      "date": "2026-11-12",
-      "stars": 3302,
-      "forks": 185,
-      "downloads": 0,
-      "clones": 83703
-    },
-    {
-      "date": "2026-11-13",
-      "stars": 3307,
-      "forks": 185,
-      "downloads": 0,
-      "clones": 85218
-    },
-    {
-      "date": "2026-11-14",
-      "stars": 3312,
-      "forks": 187,
-      "downloads": 0,
-      "clones": 85218
-    },
-    {
-      "date": "2026-11-15",
-      "stars": 3318,
-      "forks": 189,
-      "downloads": 0,
-      "clones": 85218
+      "clones": 59792
     }
   ]
 }

@@ -35,7 +35,7 @@
       },
       {
         "sourceRich": "<strong>Debian apt</strong>",
-        "path": "/usr/bin/lynis",
+        "path": "/usr/sbin/lynis",
         "update": "apt upgrade",
         "fresh": "Často mesiace / roky pozadu"
       }
@@ -57,7 +57,7 @@
     "items": [
       "<code>/usr/local/bin/lynis</code> Wrapper nainštalovaný ProxMenux",
       "<code>/opt/lynis/lynis</code> — priama cesta, ak bol spúšťací skript odstránený",
-      "<code>/usr/bin/lynis</code> — verzia nainštalovaná cez apt, ak ju používateľ nainštaloval týmto spôsobom"
+      "<code>/usr/sbin/lynis</code> — verzia nainštalovaná cez apt, ak ju používateľ nainštaloval týmto spôsobom"
     ],
     "outro": "Ak sa nájde niektorá z ciest, otvorí sa menu správy. Skript <strong>neodinštaluje</strong> Lynis nainštalovaný cez apt; odstráni iba vlastnú inštaláciu v <code>/opt/lynis</code> a jej spúšťací skript."
   },
@@ -112,7 +112,7 @@
       },
       {
         "actionRich": "<strong>Odstrániť</strong>",
-        "whatRich": "Odstráni <code>/opt/lynis</code> a <code>/usr/local/bin/lynis</code>. Záznamy na <code>/var/log/lynis*</code> sú vedené (sú audit histórie). Apt-inštalovaný Lynis na <code>/usr/bin/lynis</code> zostáva nedotknutý."
+        "whatRich": "Odstráni <code>/opt/lynis</code> a <code>/usr/local/bin/lynis</code>. Záznamy na <code>/var/log/lynis*</code> sú vedené (sú audit histórie). Apt-inštalovaný Lynis na <code>/usr/sbin/lynis</code> zostáva nedotknutý."
       }
     ]
   },
@@ -130,7 +130,7 @@
     "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
     "sshTitle": "Audit zobrazuje \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "Démon SSH umožňuje príliš veľa auth pokusov na pripojenie. Buď nainštalujte <link>Fail2Ban</link> z ProxMenux (ktorý nastaví <code>MaxAuthTries=3</code>), alebo editujte <code>/etc/ssh/sshd_config</code> ručne:",
-    "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
+    "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
     "scoreTitle": "Skóre klesol po upgrade Proxmox",
     "scoreBody": "Najprv spustite <code>lynis update info</code>; aktualizácia Lynis mohla pridať kontroly, ktoré upozorňujú na existujúcu konfiguráciu. Aktualizujte Lynis z menu, zopakujte audit a riešte nové zistenia."
   },

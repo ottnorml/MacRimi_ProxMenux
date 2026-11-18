@@ -26,6 +26,7 @@ import { GpuSwitchModeIndicator } from "./gpu-switch-mode-indicator"
 import { Settings2, CheckCircle2 } from "lucide-react"
 import { useT } from "../lib/i18n/provider"
 import { cn } from "@/lib/utils"
+import { useAccess } from "../lib/access"
 
 type TFunction = (key: string, params?: Record<string, string | number>) => string
 
@@ -33,7 +34,8 @@ const parseLsblkSize = (sizeStr: string | undefined): number => {
   if (!sizeStr) return 0
 
   // Remove spaces and convert to uppercase
-  const cleaned = sizeStr.trim().toUpperCase()
+  // lsblk follows the locale: "29,7G" on a French host
+  const cleaned = sizeStr.trim().toUpperCase().replace(",", ".")
 
   // Extract number and unit
   const match = cleaned.match(/^([\d.]+)([KMGT]?)$/)
@@ -340,6 +342,8 @@ const StorageTemperatureGroup = ({ title, temperatures }: { title: string; tempe
 }
 
 export default function Hardware() {
+  // Installing drivers and switching GPU modes run scripts on the host.
+  const { capabilities } = useAccess()
   const t = useT()
 
   // Static data - loaded once on mount. Static fields (CPU, motherboard, memory
@@ -1148,7 +1152,7 @@ return (
                               </button>
                             </>
                           ) : (
-                            <button
+                            capabilities.execute && (<button
                               className="h-7 px-3 text-xs rounded-md border border-border bg-background hover:bg-muted transition-colors flex items-center gap-1.5"
                               onClick={(e) => {
                                 e.stopPropagation()
@@ -1157,7 +1161,7 @@ return (
                             >
                               <Settings2 className="h-3 w-3" />
                               {t("actions.edit")}
-                            </button>
+                            </button>)
                           )}
                         </div>
                       </div>
@@ -1667,7 +1671,7 @@ return (
                           {getMonitoringToolRecommendation(selectedGPU.vendor, t)}
                         </p>
                         {selectedGPU.vendor.toLowerCase().includes("nvidia") && (
-                          <Button
+                          capabilities.execute && (<Button
                             onClick={handleInstallNvidiaDriver}
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                           >
@@ -1675,10 +1679,10 @@ return (
                               <Download className="mr-2 h-4 w-4" />
                               {t("hardware.actions.installNvidiaDrivers")}
                             </>
-                          </Button>
+                          </Button>)
                         )}
                         {(selectedGPU.vendor.toLowerCase().includes("amd") || selectedGPU.vendor.toLowerCase().includes("ati")) && (
-                          <Button
+                          capabilities.execute && (<Button
                             onClick={handleInstallAmdTools}
                             className="w-full bg-red-600 hover:bg-red-700 text-white"
                           >
@@ -1686,10 +1690,10 @@ return (
                               <Download className="mr-2 h-4 w-4" />
                               {t("hardware.actions.installAmdGpuTools")}
                             </>
-                          </Button>
+                          </Button>)
                         )}
                         {selectedGPU.vendor.toLowerCase().includes("intel") && (
-                          <Button
+                          capabilities.execute && (<Button
                             onClick={handleInstallIntelTools}
                             className="w-full bg-sky-600 hover:bg-sky-700 text-white"
                           >
@@ -1697,7 +1701,7 @@ return (
                               <Download className="mr-2 h-4 w-4" />
                               {t("hardware.actions.installIntelGpuTools")}
                             </>
-                          </Button>
+                          </Button>)
                         )}
                       </div>
                     </div>
@@ -1786,13 +1790,13 @@ return (
                   </p>
                 </div>
               </div>
-              <Button
+              {capabilities.execute && (<Button
                 onClick={() => setShowCoralInstaller(true)}
                 className="bg-blue-600 hover:bg-blue-700 text-white shrink-0"
               >
                 <Download className="mr-2 h-4 w-4" />
                 {t("hardware.actions.installDrivers")}
-              </Button>
+              </Button>)}
             </div>
           )}
         </Card>
@@ -1967,7 +1971,7 @@ return (
               )}
 
               {!selectedCoral.drivers_ready && (
-                <Button
+                capabilities.execute && (<Button
                   onClick={() => {
                     setSelectedCoral(null)
                     setShowCoralInstaller(true)
@@ -1976,7 +1980,7 @@ return (
                 >
                   <Download className="mr-2 h-4 w-4" />
                   {t("hardware.actions.installCoralDrivers")}
-                </Button>
+                </Button>)
               )}
             </div>
           )}

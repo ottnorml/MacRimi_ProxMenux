@@ -14,11 +14,13 @@ import os
 from pathlib import Path
 import re
 import socket
+import ssl
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 import urllib.parse
 import uuid
 import xml.etree.ElementTree as ET
@@ -28,6 +30,7 @@ import oci_instances
 import oci_nested_mounts
 import oci_stack_public_routes
 from oci_ui import translate, msg_info, msg_ok, msg_warn, msg_error, msg_info2, stop_spinner, log
+import oci_mount_lock
 
 HERE = Path(__file__).resolve().parent
 LOG_DIR = Path(os.environ.get('OCI_LOG_DIR', '/var/log/proxmenux/oci'))
@@ -245,12 +248,19 @@ def relay_child_output(stream):
     return result
 
 
+def http_url(scheme, host, port, path):
+    """Without the default port of its scheme: an application that records its
+    first request, like Nextcloud's trusted domain, sees the host a browser sends."""
+    default = (scheme, int(port)) in (('https', 443), ('http', 80))
+    return f"{scheme}://{host}{'' if default else f':{port}'}{path}"
+
+
 def assign_health_address(service):
     """Bind a generated dependency probe to its allocated private address."""
     check = service['healthcheck']
     if check['type'] == 'http':
         endpoint = check['endpoint']
-        check['url'] = f"{endpoint['scheme']}://{service['ip']}:{endpoint['port']}{endpoint['path']}"
+        check['url'] = http_url(endpoint['scheme'], service['ip'], endpoint['port'], endpoint['path'])
     elif check['type'] == 'tcp':
         check['host'] = service['ip']
 
@@ -381,7 +391,7 @@ def lan_access_urls(services, subnet, strict=True):
             if not candidates:
                 raise RuntimeError(f"{translate('No LAN address was obtained for the service:')} {service['name']}")
             urls.append({'label':service['name'],
-                         'url':f"{endpoint['scheme']}://{candidates[0]}:{endpoint['port']}{endpoint['path']}"})
+                         'url':http_url(endpoint['scheme'], candidates[0], endpoint['port'], endpoint['path'])})
         except Exception:
             if strict:
                 raise
@@ -612,7 +622,7 @@ def attach_mounts(service, temporary):
                     # Nothing was moved; the image keeps its files as before.
                     print(f'Image defaults left in place for {mount["container_path"]}: {error}', file=sys.stderr)
         finally:
-            run('pct','unmount',vmid)
+            oci_mount_lock.release(vmid, run)
         if mount['type']=='managed-volume':
             value=f"{mount['source']}:{mount['size_gb']},mp={mount['container_path']},backup=1"
         else:
@@ -652,7 +662,7 @@ def attach_mounts(service, temporary):
                 if applied:
                     os.chown(target, *declared_owner)
             finally:
-                run('pct','unmount',vmid)
+                oci_mount_lock.release(vmid, run)
 
         if mount.get('read_only'):
             config = run('pct', 'config', vmid)
@@ -662,24 +672,35 @@ def attach_mounts(service, temporary):
     oci_nested_mounts.follow(vmid)
 
 
-def web_answers(vmid, url, opener):
+def web_answers(vmid, url, opener, verify_tls=False):
     from oci_installation_state import container_curl
     curl = container_curl(vmid, lambda *args: run(*args).encode())
     if curl != ['curl']:
-        run(*curl, '-fsS', '--noproxy', '*', '-o', '/dev/null', '--max-time', '4', url)
+        tls_args = [] if verify_tls else ['--insecure']
+        run(*curl, '-fsS', '--noproxy', '*', '-o', '/dev/null', '--max-time', '4', *tls_args, url)
         return True
-    with opener.open(url,timeout=4) as response:
-        return response.status<400
+    try:
+        with opener.open(url,timeout=4) as response:
+            return response.status<400
+    except urllib.error.HTTPError as error:
+        error.close()
+        raise
 
 
 def wait_web(primary, url):
     deadline = time.monotonic()+primary['healthcheck']['timeout_seconds']
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    # Match the single-container installer and recovery probes: image-generated
+    # certificates are valid for local readiness, with strict TLS available.
+    verify_tls = primary['healthcheck'].get('verify_tls', False)
+    handlers = [urllib.request.ProxyHandler({})]
+    if not verify_tls:
+        handlers.append(urllib.request.HTTPSHandler(context=ssl._create_unverified_context()))
+    opener = urllib.request.build_opener(*handlers)
     while True:
         if run('pct','status',primary['vmid']).strip()!='status: running':
             raise RuntimeError(f"{translate('The container stopped:')} {primary['name']} (CT {primary['vmid']})")
         try:
-            if web_answers(primary['vmid'], url, opener):
+            if web_answers(primary['vmid'], url, opener, verify_tls=verify_tls):
                 check = primary['healthcheck']
                 if check.get('type') == 'exec':
                     remaining = max(1, deadline-time.monotonic())
@@ -730,7 +751,7 @@ def seed_qbittorrent(service):
             config.write(output,space_around_delimiters=False)
         os.chown(target,owner,owner)
     finally:
-        run('pct','unmount',vmid)
+        oci_mount_lock.release(vmid, run)
 
 
 def same_download_path(actual, expected):
@@ -904,7 +925,7 @@ def prepare_suite_config(service):
                 output.write('[misc]\ndownload_dir = /data/downloads/usenet-incomplete\ncomplete_dir = /data/downloads/usenet\n')
             os.chown(target,101000,101000)
     finally:
-        run('pct','unmount',vmid)
+        oci_mount_lock.release(vmid, run)
 
 
 def configure_unpackerr(services, keys):
