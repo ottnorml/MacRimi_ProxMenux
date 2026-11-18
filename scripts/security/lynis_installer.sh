@@ -90,6 +90,26 @@ lynis_managed_marker() {
     cmp -s "$marker" <(printf 'proxmenux-lynis-git-v1\n')
 }
 
+lynis_write_managed_marker() {
+  # Atomic exclusive creation: never follow an upstream-provided symlink.
+  # Python 3 is present on supported Proxmox/Debian hosts.
+  local directory="$1"
+  [[ -n "$directory" ]] || directory=/opt/lynis
+  python3 - "$directory/.proxmenux-managed" <<'PY'
+import os
+import sys
+
+flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+try:
+    fd = os.open(sys.argv[1], flags, 0o600)
+    with os.fdopen(fd, "wb") as target:
+        target.write(b"proxmenux-lynis-git-v1\n")
+except OSError as exc:
+    print(f"Lynis ownership marker could not be created: {exc}", file=sys.stderr)
+    sys.exit(1)
+PY
+}
+
 lynis_git_checkout() {
   # A directory named .git does not prove ProxMenux owns the checkout.
   [[ ! -L /opt/lynis && -d /opt/lynis/.git &&
@@ -118,7 +138,7 @@ lynis_install_target_safe() {
 }
 
 lynis_run() {
-  if [[ "$LYNIS_SOURCE" == "git" && "$LYNIS_CMD" == "/opt/lynis/lynis" ]]; then
+  if $LYNIS_MANAGED && [[ "$LYNIS_CMD" == "/opt/lynis/lynis" ]]; then
     (cd /opt/lynis && ./lynis "$@")
   else
     "$LYNIS_CMD" "$@"
@@ -208,7 +228,7 @@ install_lynis() {
   pmx_record_execution "install Lynis in /opt/lynis" "git clone https://github.com/CISOfy/lynis.git /opt/lynis"
   if git clone --quiet https://github.com/CISOfy/lynis.git /opt/lynis >/dev/null 2>&1; then
     # Record provenance before attempting to create the wrapper.
-    if ! printf 'proxmenux-lynis-git-v1\n' > /opt/lynis/.proxmenux-managed; then
+    if ! lynis_write_managed_marker /opt/lynis; then
       msg_error "$(translate "Could not record Lynis installation ownership.")"
       return 1
     fi
