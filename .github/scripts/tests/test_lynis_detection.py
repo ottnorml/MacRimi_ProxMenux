@@ -382,12 +382,67 @@ class LynisDetection(unittest.TestCase):
             "This installation is externally managed. Use its package manager to remove Lynis.",
             "Use your package manager to update or remove this Lynis installation.",
         )
-        for locale in ("de", "es", "fr", "it", "pt", "sk", "sv"):
+        for locale in ("de", "es", "fr", "it", "pt", "ru", "sk", "sv"):
             catalog = json.loads((ROOT / "lang" / f"{locale}.json").read_text())
             for key in keys:
                 with self.subTest(locale=locale, key=key):
                     self.assertIn(key, catalog)
                     self.assertTrue(catalog[key].strip())
+
+
+    def test_marker_creation_never_follows_existing_symlinks(self):
+        """The root-owned installer must never use a following > redirection."""
+        match = re.search(r"^lynis_write_managed_marker\(\) \{\n.*?^\}\n",
+                          BASH.read_text(), re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(match)
+        with tempfile.TemporaryDirectory() as root:
+            checkout = Path(root) / "lynis"
+            checkout.mkdir()
+            victim = Path(root) / "unrelated"
+            victim.write_text("DO NOT MODIFY\n")
+            marker = checkout / ".proxmenux-managed"
+            marker.symlink_to(victim)
+            cmd = match.group() + '\nlynis_write_managed_marker "$1"\n'
+            args = ["bash", "-c", cmd, "_", str(checkout)]
+            attempted = subprocess.run(args, capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(attempted.returncode, 0)
+            self.assertEqual(victim.read_text(), "DO NOT MODIFY\n")
+            marker.unlink()
+            created = subprocess.run(args, capture_output=True, text=True, timeout=10)
+            self.assertEqual(created.returncode, 0, created.stderr)
+            self.assertEqual(marker.read_bytes(), b"proxmenux-lynis-git-v1\n")
+            self.assertEqual(marker.stat().st_mode & 0o777, 0o600)
+            repeated = subprocess.run(args, capture_output=True, text=True, timeout=10)
+            self.assertNotEqual(repeated.returncode, 0)
+
+    def test_wrapperless_git_audit_uses_checkout_directory(self):
+        source = BASH.read_text()
+        match = re.search(r"^lynis_run\(\) \{\n.*?^\}\n", source,
+                          re.MULTILINE | re.DOTALL)
+        self.assertIsNotNone(match)
+        with tempfile.TemporaryDirectory() as root:
+            checkout = Path(root) / "opt/lynis"
+            checkout.mkdir(parents=True)
+            binary = checkout / "lynis"
+            binary.write_text("#!/bin/sh\npwd\n")
+            binary.chmod(0o755)
+            fn = match.group().replace("/opt/lynis", str(checkout))
+            script = (fn + '\nLYNIS_MANAGED=true\nLYNIS_CMD="' +
+                      str(binary) + '"\nlynis_run audit system\n')
+            result = subprocess.run(["bash", "-c", script], cwd=root,
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(checkout))
+
+    def test_targeted_workflow_includes_russian_docs(self):
+        workflow = (ROOT / ".github/workflows/test-lynis.yml").read_text()
+        self.assertIn("'ru'", workflow)
+        import json
+        english = json.loads((ROOT / "web/messages/en/docs/security/lynis.json").read_text())
+        russian = json.loads((ROOT / "web/messages/ru/docs/security/lynis.json").read_text())
+        self.assertEqual(russian["troubleshoot"]["notFoundCode"],
+                         english["troubleshoot"]["notFoundCode"])
+
 
 
 if __name__ == "__main__":
