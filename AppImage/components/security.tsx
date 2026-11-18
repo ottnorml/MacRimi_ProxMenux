@@ -4219,7 +4219,7 @@ ${(report.sections && report.sections.length > 0) ? `
               <CardTitle>{st("lynis.title")}</CardTitle>
             </div>
             {/* ProxMenux removes only the copy it installed. */}
-            {lynisInfo?.installed && lynisInfo.managed !== false && (
+            {lynisInfo?.installed && lynisInfo.managed === true && (
               capabilities.execute && (<Button
                 variant="outline"
                 size="sm"

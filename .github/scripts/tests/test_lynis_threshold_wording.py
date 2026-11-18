@@ -94,7 +94,8 @@ class LynisThresholdContracts(unittest.TestCase):
         original_import = __import__
         def fake_import(name, *args, **kwargs):
             return FakeShutil if name == 'shutil' else original_import(name, *args, **kwargs)
-        namespace = {'os': fake_os}
+        fake_os.path.islink = lambda p: False
+        namespace = {'os': fake_os, '_find_lynis_installation': lambda: ('/opt/lynis/lynis', 'git'), '_lynis_is_managed_wrapper': lambda: True, '_lynis_git_checkout_owned': lambda: True}
         with patch('builtins.__import__', side_effect=fake_import):
             exec(compile(module, '<inert lynis uninstall>', 'exec'), namespace)
             result = namespace['uninstall_lynis']()

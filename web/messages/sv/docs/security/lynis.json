@@ -16,7 +16,7 @@
   },
   "manageMenu": {
     "heading": "Hanteringsmeny (efter installation)",
-    "intro": "Efter installationen öppnar varje nytt anrop hanteringsmenyn. Där kan du starta en granskning, uppdatera med git pull, installera om eller avinstallera.",
+    "intro": "Tillgängliga åtgärder beror på ursprung: ProxMenux Git-installationer kan granskas, uppdateras, ominstalleras och tas bort; externa installationer kan bara granskas.",
     "imageAlt": "Lynis management meny med revision, uppdatering, ominstallera och ta bort alternativ"
   },
   "whyUpstream": {
@@ -53,13 +53,13 @@
   },
   "detection": {
     "heading": "Detektering vägar",
-    "intro": "Innan du visar menyn kontrollerar manuset tre platser för att avgöra om Lynis redan är närvarande:",
+    "intro": "Installationsskriptet kontrollerar kända sökvägar för Git- och paketinstallationer samt körbara filer i PATH. Viktiga exempel:",
     "items": [
       "<code>/usr/local/bin/lynis</code> Wrapper installerad av ProxMenux",
       "<code>/opt/lynis/lynis</code> - direkt väg (om wrapperen togs bort)",
       "<code>/usr/sbin/lynis</code> apt-installerad version, om användaren installerade den på det sättet tidigare"
     ],
-    "outro": "Om någon av sökvägarna hittas öppnas hanteringsmenyn. Skriptet avinstallerar <strong>inte</strong> Lynis som installerats via apt, bara den egna installationen i <code>/opt/lynis</code> och dess startskript."
+    "outro": "En verifierad Git-installation från ProxMenux kan granskas, uppdateras, ominstalleras och tas bort. Externa eller pakethanterade installationer kan bara granskas; använd pakethanteraren för uppdatering och borttagning."
   },
   "audit": {
     "heading": "Kör en revision",
@@ -99,7 +99,7 @@
   },
   "update": {
     "heading": "Uppdatering Lynis",
-    "body": "I menyn kör <strong>Uppdatera Lynis till senaste versionen</strong> kommandot <code>git pull --quiet</code> i <code>/opt/lynis</code>. Om katalogen finns men inte är en Git-arbetskopia, exempelvis efter manuell filkopiering, gör skriptet en fullständig ominstallation."
+    "body": "För en verifierad Git-installation från ProxMenux kör <strong>Uppdatera Lynis</strong> <code>git pull --quiet</code> i <code>/opt/lynis</code>. Externa installationer uppdateras via pakethanteraren och ersätts inte med Git."
   },
   "reinstall": {
     "heading": "Installera om / avinstallera",
@@ -127,7 +127,7 @@
     "cloneBody": "Värden behöver nätverksåtkomst och DNS för att nå <code>github.com</code>. Från en konsol: <code>curl -sI https://github.com</code> och <code>git ls-remote https://github.com/CISOfy/lynis.git</code> kommer att avslöja det faktiska felet (DNS, TLS, proxy, repo URL). Om en proxy krävs, sätt <code>https_proxy</code> i miljön innan du kör menyn.",
     "notFoundTitle": "lynis: kommandot som inte hittats efter installation",
     "notFoundIntro": "Startskriptet <code>/usr/local/bin/lynis</code> skapades inte eller har tagits bort. Snabbaste lösningen är att installera om via menyn. Manuell lösning:",
-    "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
+    "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "Granskningen visar \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "SSH daemon tillåter för många auth försök per anslutning. Antingen installera <link>Fail2Ban</link> från ProxMenux (som sätter <code>MaxAuthTries=3</code> automatiskt) eller redigera <code>/etc/ssh/sshd_config</code> för hand:",
     "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",

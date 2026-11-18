@@ -59,15 +59,18 @@ class LynisOriginTests(unittest.TestCase):
         self.executable(self.clone / "lynis", '#!/bin/sh\n    PROGRAM_VERSION="3.1.8"\n')
         self.executable(self.wrapper, f"#!/bin/bash\ncd {self.clone} && ./lynis \"$@\"\n")
         self.executable(self.package)
-        self.assertEqual(security_manager._find_lynis_cmd(), str(self.wrapper))
-        info = security_manager._detect_lynis()
+        # Simulate an installed checkout; ownership is tested separately.
+        with mock.patch.object(security_manager, "_lynis_git_checkout_owned", return_value=True), \
+                mock.patch.object(security_manager, "_lynis_is_managed_wrapper", return_value=True):
+            self.assertEqual(security_manager._find_lynis_cmd(), str(self.wrapper))
+            info = security_manager._detect_lynis()
         self.assertTrue(info["managed"])
         # The wrapper has no version line: it is read from the clone.
         self.assertEqual(info["version"], "3.1.8")
 
-    def test_the_wrapper_alone_is_still_the_copy_of_proxmenux(self):
+    def test_an_unverified_wrapper_alone_is_not_managed(self):
         self.executable(self.wrapper, f"#!/bin/bash\ncd {self.clone} && ./lynis \"$@\"\n")
-        self.assertTrue(security_manager._lynis_installed_by_proxmenux())
+        self.assertFalse(security_manager._lynis_installed_by_proxmenux())
 
     def test_the_installer_looks_for_the_package_path(self):
         installer = (SCRIPTS.parents[1] / "scripts/security/lynis_installer.sh").read_text(encoding="utf-8")

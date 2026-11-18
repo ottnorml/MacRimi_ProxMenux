@@ -16,7 +16,7 @@
   },
   "manageMenu": {
     "heading": "Menu de gestão (após a instalação)",
-    "intro": "Uma vez instalado o Lynis, cada invocação subsequente abre o menu de gerenciamento em vez de repetir o instalador. A partir daqui você inicia uma auditoria, atualização via git pull, reinstalar ou desinstalar:",
+    "intro": "As ações dependem da origem: instalações Git ProxMenux permitem auditoria, atualização, reinstalação e remoção; instalações externas permitem apenas auditoria.",
     "imageAlt": "Menu de gerenciamento do Lynis com as opções de auditoria, atualização, reinstalação e remoção"
   },
   "whyUpstream": {
@@ -53,13 +53,13 @@
   },
   "detection": {
     "heading": "Caminhos de detecção",
-    "intro": "Antes de mostrar o menu, o script verifica três locais para decidir se Lynis já está presente:",
+    "intro": "O instalador verifica caminhos conhecidos de Git e de pacotes, além dos executáveis encontrados no PATH. Exemplos principais:",
     "items": [
       "<code>/usr/local/bin/lynis</code> — invólucro instalado por ProxMenux",
       "<code>/opt/lynis/lynis</code> — caminho direto (caso o invólucro tenha sido removido)",
       "<code>/usr/sbin/lynis</code> — versão apt-instalada, se o usuário a instalou dessa forma anteriormente"
     ],
-    "outro": "Se encontrar um destes caminhos, abre o menu de gestão. O script <strong>não</strong> desinstala Lynis instalado por apt; remove apenas o que gere em <code>/opt/lynis</code> e o respetivo lançador."
+    "outro": "Uma instalação Git ProxMenux verificada permite auditoria, atualização, reinstalação e remoção. As instalações externas ou geridas por pacotes permitem apenas auditorias; use o gestor de pacotes para atualizar ou remover."
   },
   "audit": {
     "heading": "Executar uma auditoria",
@@ -99,7 +99,7 @@
   },
   "update": {
     "heading": "Actualizar o Lynis",
-    "body": "No menu, <strong>Atualizar Lynis para a versão mais recente</strong> executa <code>git pull --quiet</code> em <code>/opt/lynis</code>. Se o diretório existir mas não for uma cópia de trabalho Git, por exemplo após copiar ficheiros manualmente, o script reinstala por completo."
+    "body": "Para um checkout Git ProxMenux verificado, <strong>Atualizar Lynis</strong> executa <code>git pull --quiet</code> em <code>/opt/lynis</code>. Instalações externas são atualizadas pelo gestor de pacotes e não são substituídas por Git."
   },
   "reinstall": {
     "heading": "Reinstalar / desinstalar",
@@ -127,7 +127,7 @@
     "cloneBody": "O host precisa de acesso à rede e DNS para alcançar <code>github.com</code>. A partir de um console: <code>curl -sI https://github.com</code> e <code>git ls-remote https://github.com/CISOfy/lynis.git</code> irá revelar o erro real (DNS, TLS, proxy, URL repo). Se for necessário um proxy, defina <code>https_proxy</code> no ambiente antes de executar novamente o menu.",
     "notFoundTitle": "lynis: comando não encontrado após a instalação",
     "notFoundIntro": "O lançador <code>/usr/local/bin/lynis</code> não foi criado ou foi removido. A solução mais rápida é reinstalar a partir do menu. Correção manual:",
-    "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
+    "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "A auditoria mostra \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "O servidor SSH permite demasiadas tentativas de autenticação por ligação. Instale o <link>Fail2Ban</link> do ProxMenux (que define o <code>MaxAuthTries=3</code> automaticamente) ou edite o <code>/etc/ssh/sshd_config</code> à mão:",
     "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",

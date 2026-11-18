@@ -1,0 +1,67 @@
+name: Lynis detection and ownership regressions
+
+on:
+  push:
+    branches: [main, develop, bugfix/675-lynis-detection]
+    paths:
+      - '.github/workflows/test-lynis.yml'
+      - '.github/scripts/tests/test_lynis*.py'
+      - 'scripts/security/lynis_installer.sh'
+      - 'AppImage/scripts/security_manager.py'
+      - 'AppImage/components/security.tsx'
+      - 'AppImage/scripts/flask_security_routes.py'
+      - 'web/messages/*/docs/security/lynis.json'
+      - 'lang/*.json'
+  pull_request:
+    paths:
+      - '.github/workflows/test-lynis.yml'
+      - '.github/scripts/tests/test_lynis*.py'
+      - 'scripts/security/lynis_installer.sh'
+      - 'AppImage/scripts/security_manager.py'
+      - 'AppImage/components/security.tsx'
+      - 'AppImage/scripts/flask_security_routes.py'
+      - 'web/messages/*/docs/security/lynis.json'
+      - 'lang/*.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lynis-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+      - name: Shell syntax
+        run: bash -n scripts/security/lynis_installer.sh
+      - name: Python syntax
+        run: python -m py_compile AppImage/scripts/security_manager.py .github/scripts/tests/test_lynis_detection.py
+      - name: Isolated detection and lifecycle tests
+        run: |
+          python -B -m unittest discover -s .github/scripts/tests -p 'test_lynis_detection.py' -v
+          python -B -m unittest discover -s .github/scripts/tests -p 'test_lynis_feedback.py' -v
+          python -B -m unittest discover -s .github/scripts/tests -p 'test_lynis_threshold_wording.py' -v
+      - name: Localized documentation JSON and path parity
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('web/messages')
+          for lang in ('en','de','es','fr','it','pt','ru','sk','sv'):
+              text = (root/lang/'docs/security/lynis.json').read_text()
+              document = json.loads(text)
+              assert document['whyUpstream']['rows'][1]['path'] == '/usr/sbin/lynis'
+              assert '/usr/sbin/lynis' in document['detection']['items'][2]
+              assert '/usr/local/bin/lynis' in text
+              assert '/usr/bin/lynis' not in text
+              print(f'{lang}: OK')
+          PY
