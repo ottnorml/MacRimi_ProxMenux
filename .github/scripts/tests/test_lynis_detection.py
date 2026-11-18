@@ -316,5 +316,38 @@ class LynisDetection(unittest.TestCase):
 
 
 
+    def test_lynis_terminal_catalog_filters(self):
+        """Locale-only PRs must trigger the targeted Lynis workflow."""
+        workflow = (ROOT / ".github/workflows/test-lynis.yml").read_text()
+        for event, next_event in (
+            ("push", "pull_request"),
+            ("pull_request", "workflow_dispatch"),
+        ):
+            with self.subTest(event=event):
+                start = f"  {event}:\\n"
+                end = f"\\n  {next_event}:"
+                self.assertIn(start, workflow)
+                event_block = workflow.split(start, 1)[1].split(end, 1)[0]
+                self.assertIn("'lang/*.json'", event_block)
+
+    def test_terminal_safety_messages_have_all_supported_translations(self):
+        """Prevent untranslated Lynis safety warnings on future locale edits."""
+        import json
+        keys = (
+            "Existing Lynis files are not managed by ProxMenux. Refusing to overwrite them.",
+            "Could not record Lynis installation ownership.",
+            "Unsafe Lynis wrapper target. Refusing to overwrite it.",
+            "This installation is externally managed. Use its package manager to update Lynis.",
+            "This installation is externally managed. Use its package manager to remove Lynis.",
+            "Use your package manager to update or remove this Lynis installation.",
+        )
+        for locale in ("de", "es", "fr", "it", "pt", "sk", "sv"):
+            catalog = json.loads((ROOT / "lang" / f"{locale}.json").read_text())
+            for key in keys:
+                with self.subTest(locale=locale, key=key):
+                    self.assertIn(key, catalog)
+                    self.assertTrue(catalog[key].strip())
+
+
 if __name__ == "__main__":
     unittest.main()
