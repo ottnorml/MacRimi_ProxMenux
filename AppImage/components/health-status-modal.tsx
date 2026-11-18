@@ -45,6 +45,7 @@ import { HostUpdateJobs, type HostUpdateJob } from "./host-update-jobs"
 import { HostUpdateResult } from "./host-update-result"
 import { RestartAfterUpdate, ProxMenuxVersionCard } from "./host-update-status"
 import { useT } from "@/lib/i18n/provider"
+import { useAccess } from "@/lib/access"
 import { useIsPbs } from "@/lib/use-platform"
 
 interface CategoryCheck {
@@ -123,6 +124,7 @@ const CATEGORIES = [
 
 export function HealthStatusModal({ open, onOpenChange, getApiUrl }: HealthStatusModalProps) {
   const t = useT()
+  const { capabilities } = useAccess()
   const isPbs = useIsPbs()
   const [loading, setLoading] = useState(true)
   const [healthData, setHealthData] = useState<HealthDetails | null>(null)
@@ -432,6 +434,10 @@ export function HealthStatusModal({ open, onOpenChange, getApiUrl }: HealthStatu
     if (match) return t("healthStatus.details.storageAvailable", { type: match[1] })
     match = value.match(/^(.+) mount reachable$/)
     if (match) return t("healthStatus.details.mountReachable", { type: match[1] })
+    match = value.match(/^(.+) mount reachable, read-only$/)
+    if (match) return t("healthStatus.details.mountReachableReadOnly", { type: match[1] })
+    match = value.match(/^(.+) mount read-only, configured read-write$/)
+    if (match) return t("healthStatus.details.mountReadOnlyConfiguredRw", { type: match[1] })
     match = value.match(/^rootfs ([\d.]+)% used \((.+)\)$/)
     if (match) return t("healthStatus.details.rootfsUsed", { percent: match[1], size: match[2] })
     match = value.match(/^(\d+) running CT\(s\) within safe rootfs usage$/)
@@ -749,7 +755,7 @@ export function HealthStatusModal({ open, onOpenChange, getApiUrl }: HealthStatu
                 )}
               </div>
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-                {(checkStatus === "WARNING" || checkStatus === "CRITICAL" || checkStatus === "UNKNOWN") && isDismissable && !checkData.dismissed && (
+                {(checkStatus === "WARNING" || checkStatus === "CRITICAL" || checkStatus === "UNKNOWN") && isDismissable && !checkData.dismissed && capabilities.admin && (
                   <DismissDropdown
                     onSelect={(hours) =>
                       handleAcknowledge(checkData.error_key || checkKey, hours)
@@ -915,7 +921,7 @@ export function HealthStatusModal({ open, onOpenChange, getApiUrl }: HealthStatu
                           <div className="flex items-center justify-between gap-2 px-3 py-1.5 mb-1">
                             <p className="text-xs text-muted-foreground break-words whitespace-pre-wrap flex-1">{reason}</p>
                             {/* Show dismiss button for UNKNOWN status at category level when dismissable */}
-                            {status === "UNKNOWN" && categoryData?.dismissable && !hasChecks && (
+                            {status === "UNKNOWN" && categoryData?.dismissable && !hasChecks && capabilities.admin && (
                               <DismissDropdown
                                 onSelect={(hours) =>
                                   handleAcknowledge(`category_${key}_unknown`, hours)
@@ -944,7 +950,7 @@ export function HealthStatusModal({ open, onOpenChange, getApiUrl }: HealthStatu
                             {t("healthStatus.packagePlanNote")}
                           </p>
                         )}
-                        {key === "updates" && Number(categoryData?.count ?? 0) > 0 && (
+                        {key === "updates" && Number(categoryData?.count ?? 0) > 0 && capabilities.update && (
                           <div className="flex justify-end px-2 sm:px-3 pt-3 pb-1">
                             <Button
                               size="sm"

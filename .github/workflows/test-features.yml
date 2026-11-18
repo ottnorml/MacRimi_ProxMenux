@@ -7,7 +7,9 @@ on:
       - 'AppImage/scripts/notification_manager.py'
       - 'AppImage/scripts/notification_templates.py'
       - 'AppImage/scripts/ai_context_enrichment.py'
-      - 'AppImage/scripts/ai_providers/base.py'
+      - 'AppImage/scripts/ai_providers/**'
+      - 'AppImage/config/verified_ai_models.json'
+      - 'AppImage/scripts/tests/test_groq_model_recommendations.py'
       - 'AppImage/scripts/tests/test_backup_ai_diagnostics.py'
       - 'AppImage/scripts/notification_channels.py'
       - 'AppImage/components/apprise-service-help.tsx'
@@ -30,6 +32,12 @@ on:
       - 'AppImage/scripts/flask_proxmenux_routes.py'
       - 'AppImage/scripts/guest_backup_archives.py'
       - 'AppImage/scripts/flask_server.py'
+      - 'AppImage/scripts/tests/test_static_path_containment.py'
+      - 'AppImage/scripts/ovs_topology.py'
+      - 'AppImage/scripts/tests/test_ovs_topology.py'
+      - 'AppImage/components/network-flow.tsx'
+      - 'AppImage/components/network-metrics.tsx'
+      - 'AppImage/tests/ovs-network-flow.cjs'
       - 'AppImage/scripts/jwt_middleware.py'
       - 'AppImage/scripts/build_appimage.sh'
       - 'AppImage/components/guest-backup-list.tsx'
@@ -72,7 +80,9 @@ on:
       - 'AppImage/scripts/notification_manager.py'
       - 'AppImage/scripts/notification_templates.py'
       - 'AppImage/scripts/ai_context_enrichment.py'
-      - 'AppImage/scripts/ai_providers/base.py'
+      - 'AppImage/scripts/ai_providers/**'
+      - 'AppImage/config/verified_ai_models.json'
+      - 'AppImage/scripts/tests/test_groq_model_recommendations.py'
       - 'AppImage/scripts/tests/test_backup_ai_diagnostics.py'
       - 'AppImage/scripts/notification_channels.py'
       - 'AppImage/components/apprise-service-help.tsx'
@@ -89,6 +99,12 @@ on:
       - 'AppImage/scripts/flask_proxmenux_routes.py'
       - 'AppImage/scripts/guest_backup_archives.py'
       - 'AppImage/scripts/flask_server.py'
+      - 'AppImage/scripts/tests/test_static_path_containment.py'
+      - 'AppImage/scripts/ovs_topology.py'
+      - 'AppImage/scripts/tests/test_ovs_topology.py'
+      - 'AppImage/components/network-flow.tsx'
+      - 'AppImage/components/network-metrics.tsx'
+      - 'AppImage/tests/ovs-network-flow.cjs'
       - 'AppImage/scripts/jwt_middleware.py'
       - 'AppImage/components/guest-backup-list.tsx'
       - 'AppImage/components/virtual-machines.tsx'
@@ -175,6 +191,21 @@ jobs:
           NODE_PATH: ${{ github.workspace }}/.github/ci/offline-node/node_modules
         run: node tests/test_backup_storage_retention.cjs
 
+  static-files:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Flask
+        run: python -m pip install 'Flask==3.1.2'
+      - name: Test that the Monitor's own files never leave their folder
+        run: python -B -m unittest discover -s AppImage/scripts/tests -p test_static_path_containment.py -v
+
   nvidia-installer:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -189,6 +220,19 @@ jobs:
         run: |
           bash -n scripts/gpu_tpu/nvidia_installer.sh
           python3 -B -m unittest discover -s tests -p 'test_nvidia*.py' -v
+
+  ai-model-availability:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Test model ordering and curated availability without network or credentials
+        run: python -B -m unittest discover -s AppImage/scripts/tests -p test_groq_model_recommendations.py -v
 
   installer-and-release:
     runs-on: ubuntu-latest
@@ -220,8 +264,14 @@ jobs:
             archive="figurine_linux_${arch}_v${FIGURINE_VERSION}.tar.gz"
             target="$scratch/$arch"
             mkdir -p "$target"
-            curl --fail --location --retry 3 --output "$target/$archive" \
-              "https://github.com/arsham/figurine/releases/download/v${FIGURINE_VERSION}/$archive"
+            # An unavailable GitHub Releases download is reported, not failed;
+            # a checksum or execution failure still fails the job.
+            if ! curl --fail --location --retry 6 --retry-delay 10 --retry-all-errors \
+                --output "$target/$archive" \
+                "https://github.com/arsham/figurine/releases/download/v${FIGURINE_VERSION}/$archive"; then
+              printf '::warning::%s release download unavailable; skipped\n' "$arch"
+              continue
+            fi
             printf '%s  %s\n' "$sha" "$target/$archive" | sha256sum --check
             tar -xf "$target/$archive" -C "$target"
             runner=()
@@ -318,6 +368,20 @@ jobs:
         run: |
           python3 -m unittest discover -s oci/tests -p 'test_carried*.py' -v
           python3 -m unittest discover -s oci/tests -p test_restore_recovery.py -v
+      - name: Run unmount lock, preflight, stale operation and host source regressions
+        env:
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python3 -m unittest discover -s oci/tests -p test_mount_lock.py -v
+          python3 -m unittest discover -s oci/tests -p test_changed_settings.py -v
+          python3 -m unittest discover -s oci/tests -p test_stale_operation.py -v
+          python3 -m unittest discover -s oci/tests -p test_host_source_identity.py -v
+          python3 -m unittest discover -s oci/tests -p test_stack_replay_devices.py -v
+          python3 -m unittest discover -s oci/tests -p test_cli_architecture.py -v
+          python3 -m unittest discover -s oci/tests -p test_usb_passthrough.py -v
+          python3 -m unittest discover -s oci/tests -p test_nut_config.py -v
+          python3 -m unittest discover -s oci/tests -p test_stack_member_usb.py -v
+          python3 -m unittest discover -s oci/tests -p test_installer_helpers_packaged.py -v
       - name: Run read-only volume preparation regressions
         env:
           PYTHONDONTWRITEBYTECODE: '1'
@@ -408,3 +472,33 @@ jobs:
         run: |
           npm ci --prefix .github/ci/offline-node --legacy-peer-deps --ignore-scripts --no-audit --no-fund
           NODE_PATH="$PWD/.github/ci/offline-node/node_modules" node AppImage/tests/pbs-navigation.cjs
+
+  native-image-import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Exercise private images with isolated mapped Linux readers
+        run: sudo /usr/bin/python3 -B -m unittest discover -s oci/tests -p test_native_import_access.py -v
+
+  network-topology:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22.14.0'
+      - name: Test read-only OVS discovery and mixed network API
+        run: python -B -m unittest discover -s AppImage/scripts/tests -p test_ovs_topology.py -v
+      - name: Test both Network Flow layouts
+        run: |
+          npm ci --prefix .github/ci/offline-node --ignore-scripts --no-audit --no-fund
+          NODE_PATH="$PWD/.github/ci/offline-node/node_modules" node AppImage/tests/ovs-network-flow.cjs

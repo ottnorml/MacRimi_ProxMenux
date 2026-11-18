@@ -7,8 +7,9 @@ from pathlib import Path, PurePosixPath
 import stat
 import subprocess
 
-from oci_gpu_devices import actual_devices
+from oci_gpu_devices import actual_devices, device_fields
 from oci_ui import translate
+import oci_usb_passthrough as usb_passthrough
 
 KEY = '_nvidia_runtime'
 QUERY = '--query-gpu=uuid,pci.bus_id,driver_version'
@@ -99,12 +100,13 @@ def refresh_plan(config, previous, current=None, same_gpu=True):
     # Remove only entries already validated against our recorded inventory.
     kept = []
     for line in config.decode().splitlines():
-        if line.startswith('lxc.mount.entry: '):
+        # The lines of the USB devices passed by their identity stay.
+        if line.startswith('lxc.mount.entry: ') and not usb_passthrough.own(line):
             continue
         if line.startswith('dev') and ': ' in line:
             key, properties = line.split(': ', 1)
             if key[3:].isdigit():
-                fields = dict(part.split('=', 1) for part in properties.split(','))
+                fields = device_fields(properties)
                 if fields.get('path') in previous['devices']:
                     continue
         kept.append(line)
@@ -124,7 +126,8 @@ def refresh_plan(config, previous, current=None, same_gpu=True):
 
 
 def mount_lines(config):
-    return [line.split(': ', 1)[1] for line in config.decode().splitlines() if line.startswith('lxc.mount.entry: ')]
+    return [line.split(': ', 1)[1] for line in config.decode().splitlines()
+            if line.startswith('lxc.mount.entry: ') and not usb_passthrough.own(line)]
 
 
 def check_mounts(config, value, complete=True):

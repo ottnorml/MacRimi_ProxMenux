@@ -17,6 +17,7 @@ PYTHON_FILES = (
     "tests/test_host_update_transport.py",
     "tests/test_host_update_shell.py",
     "tests/test_host_update_auth.py",
+    "tests/test_repository_downstream.py",
     "tests/test_kernel_reboot.py",
     "tests/test_reboot_health_refresh.py",
     "tests/test_host_update_controls.py",
@@ -40,6 +41,12 @@ PYTHON_FILES = (
     "tests/storage/test_nvme_status_message.py",
     "tests/test_fastfetch_config_generation.py",
     "tests/test_notification_active_payloads.py",
+    "tests/test_email_digest_rows.py",
+    "AppImage/scripts/tests/test_app_watch_copies.py",
+    "AppImage/scripts/tests/test_catalog_architecture.py",
+    "AppImage/scripts/tests/test_catalog_same_app.py",
+    "AppImage/scripts/tests/test_lynis_origin.py",
+    "AppImage/scripts/tests/test_snippets_storage_readonly.py",
     "AppImage/scripts/tests/test_health_persistence_recurrence.py",
 )
 NODE_FILES = (

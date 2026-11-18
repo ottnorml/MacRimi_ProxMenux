@@ -20,14 +20,17 @@
 #   - Wrapper script at /usr/local/bin/lynis that cd's into /opt/lynis
 #     before invoking ./lynis (Lynis requires being run from its own
 #     directory).
-#   - Detects the ProxMenux Git checkout and external Lynis executables,
-#     including Debian's /usr/sbin/lynis, before showing the menu.
+#   - Detection looks at /usr/local/bin/lynis and /opt/lynis/lynis, then
+#     /usr/sbin/lynis (a Lynis installed another way, such as the Debian
+#     package or the CISOfy APT repository).
+#   - A Lynis installed another way is only audited: it is updated and
+#     removed the same way it was installed.
 #   - Update action: 'git pull' inside /opt/lynis. Falls back to a
 #     full reinstall if .git is missing.
 #   - Run-audit action: launches 'lynis audit system --no-colors'
 #     directly from the menu.
-#   - Clean uninstall: removes verified ProxMenux files only;
-#     Debian/CISOfy package installations are left untouched.
+#   - Clean uninstall: removes verified ProxMenux Git files only;
+#     package-managed and unrelated installations are never removed.
 #   - Component status tracked in components_status.json.
 # ==========================================================
 # Hybrid script: works from terminal (dialog) and web panel (ScriptTerminalModal)
@@ -61,6 +64,19 @@ initialize_cache
 # ==========================================================
 # Detection
 # ==========================================================
+# The version written in the Lynis script. Running Lynis, even for
+# 'show version', rewrites /var/log/lynis-report.dat and loses the report
+# of the last audit.
+# Read PROGRAM_VERSION without running Lynis: even "show version"
+# rewrites the last audit report on some package builds.
+lynis_script_version() {
+  local script="$1"
+  if [[ "$script" == /usr/local/bin/lynis ]] && lynis_is_managed_wrapper; then
+    script=/opt/lynis/lynis
+  fi
+  sed -n 's/^[[:space:]]*PROGRAM_VERSION="\([^"]*\)".*/\1/p' "$script" 2>/dev/null | head -n 1
+}
+
 lynis_is_managed_wrapper() {
   # Compare every byte: matching two lines is not sufficient for ownership.
   [[ ! -L /usr/local/bin/lynis &&
@@ -111,20 +127,20 @@ lynis_run() {
 
 detect_lynis() {
   LYNIS_INSTALLED=false
+  LYNIS_MANAGED=false
   LYNIS_VERSION=""
   LYNIS_CMD=""
-  LYNIS_SOURCE="none"
 
   local path
   if lynis_git_checkout; then
-    LYNIS_SOURCE="git"
+    LYNIS_MANAGED=true
     if lynis_is_managed_wrapper; then
       LYNIS_CMD=/usr/local/bin/lynis
     else
       LYNIS_CMD=/opt/lynis/lynis
     fi
   else
-    # Explicit locations work when a service PATH omits /usr/sbin.
+    # Prefer packaged Lynis even if an unrelated checkout also exists.
     for path in /usr/sbin/lynis /usr/bin/lynis /usr/local/bin/lynis /opt/lynis/lynis; do
       if [[ -f "$path" && -x "$path" ]]; then
         LYNIS_CMD="$path"
@@ -137,15 +153,14 @@ detect_lynis() {
         LYNIS_CMD="$path"
       fi
     fi
-    [[ -n "$LYNIS_CMD" ]] && LYNIS_SOURCE="external"
   fi
 
   if [[ -n "$LYNIS_CMD" ]]; then
     LYNIS_INSTALLED=true
-    LYNIS_VERSION="$(lynis_run show version 2>/dev/null || echo unknown)"
+    LYNIS_VERSION="$(lynis_script_version "$LYNIS_CMD")"
+    [[ -n "$LYNIS_VERSION" ]] || LYNIS_VERSION="unknown"
   fi
 }
-
 
 # ==========================================================
 # Installation
@@ -173,7 +188,7 @@ install_lynis() {
     fi
   fi
 
-  # Reject unowned paths and symlinks before deleting or cloning files.
+  # Do not replace unrelated Git checkouts or foreign wrappers/symlinks.
   if { [[ -e /opt/lynis || -L /opt/lynis ]] && ! lynis_git_checkout; } ||
      ! lynis_install_target_safe; then
     msg_error "$(translate "Existing Lynis files are not managed by ProxMenux. Refusing to overwrite them.")"
@@ -192,11 +207,12 @@ install_lynis() {
   msg_info "$(translate "Cloning Lynis from GitHub...")"
   pmx_record_execution "install Lynis in /opt/lynis" "git clone https://github.com/CISOfy/lynis.git /opt/lynis"
   if git clone --quiet https://github.com/CISOfy/lynis.git /opt/lynis >/dev/null 2>&1; then
+    # Record provenance before attempting to create the wrapper.
     if ! printf 'proxmenux-lynis-git-v1\n' > /opt/lynis/.proxmenux-managed; then
       msg_error "$(translate "Could not record Lynis installation ownership.")"
       return 1
     fi
-    # pmx_write_file follows symlinks; recheck just before writing.
+    # pmx_write_file follows symlinks; check again immediately before writing.
     if ! lynis_install_target_safe; then
       msg_error "$(translate "Unsafe Lynis wrapper target. Refusing to overwrite it.")"
       return 1
@@ -214,9 +230,9 @@ EOF
   fi
 
   # Verify
-  if /usr/local/bin/lynis show version >/dev/null 2>&1; then
-    local version
-    version=$(/usr/local/bin/lynis show version 2>/dev/null)
+  local version
+  version=$(lynis_script_version /usr/local/bin/lynis)
+  if [[ -x /usr/local/bin/lynis && -n "$version" ]]; then
     update_component_status "lynis" "installed" "$version" "security" '{}'
     msg_ok "$(translate "Lynis version:") $version"
     msg_success "$(translate "Lynis is ready to use")"
@@ -244,7 +260,7 @@ update_lynis() {
   msg_info2 "$(translate "Updating Lynis to the latest version...")"
 
   detect_lynis
-  if [[ "$LYNIS_SOURCE" != "git" ]]; then
+  if ! $LYNIS_MANAGED || ! lynis_git_checkout; then
     msg_error "$(translate "This installation is externally managed. Use its package manager to update Lynis.")"
     return 1
   fi
@@ -255,7 +271,7 @@ update_lynis() {
     pmx_record_execution "update Lynis installation in /opt/lynis" "git pull --quiet"
     if git pull --quiet >/dev/null 2>&1; then
       local version
-      version=$(lynis_run show version 2>/dev/null)
+      version=$(lynis_script_version /opt/lynis/lynis)
       update_component_status "lynis" "installed" "$version" "security" '{}'
       msg_ok "$(translate "Lynis updated to version:") $version"
     else
@@ -311,10 +327,11 @@ uninstall_lynis() {
   msg_info2 "$(translate "Removing Lynis...")"
 
   detect_lynis
-  if [[ "$LYNIS_SOURCE" != "git" ]] || ! lynis_git_checkout; then
+  if ! $LYNIS_MANAGED || ! lynis_git_checkout; then
     msg_error "$(translate "This installation is externally managed. Use its package manager to remove Lynis.")"
     return 1
   fi
+
   local remove_wrapper=false
   lynis_is_managed_wrapper && remove_wrapper=true
   pmx_record_execution "remove Lynis installation from /opt/lynis" "rm -rf /opt/lynis"
@@ -337,6 +354,25 @@ uninstall_lynis() {
 main() {
   detect_lynis
 
+  if $LYNIS_INSTALLED && ! $LYNIS_MANAGED; then
+    # Installed another way: ProxMenux runs its audit and leaves updating
+    # and removing it to the way it was installed.
+    local outside_text
+    outside_text="\n$(translate 'Lynis is currently installed.')\n"
+    outside_text+="$(translate 'Version:') $LYNIS_VERSION\n\n"
+    outside_text+="$(translate 'This Lynis was not installed by ProxMenux. ProxMenux can run its audit; update or remove it the same way it was installed.')\n\n"
+    outside_text+="$(translate 'What would you like to do?')"
+
+    local OUTSIDE_ACTION
+    OUTSIDE_ACTION=$(hybrid_menu "$(translate 'Lynis Management')" "$outside_text" 20 70 2 \
+      "audit" "$(translate 'Run security audit now')" \
+      "cancel" "$(translate 'Cancel')" \
+    ) || OUTSIDE_ACTION="cancel"
+
+    [[ "$OUTSIDE_ACTION" == "audit" ]] && run_audit
+    exit 0
+  fi
+
   if $LYNIS_INSTALLED; then
     # Already installed - show action menu
     local action_text
@@ -345,21 +381,13 @@ main() {
     action_text+="$(translate 'What would you like to do?')"
 
     local ACTION
-    if [[ "$LYNIS_SOURCE" == "git" ]]; then
-      ACTION=$(hybrid_menu "$(translate 'Lynis Management')" "$action_text" 20 70 5 \
-        "audit" "$(translate 'Run security audit now')" \
-        "update" "$(translate 'Update Lynis to latest version')" \
-        "reinstall" "$(translate 'Reinstall Lynis')" \
-        "remove" "$(translate 'Uninstall Lynis')" \
-        "cancel" "$(translate 'Cancel')" \
-      ) || ACTION="cancel"
-    else
-      action_text+="\n$(translate 'Use your package manager to update or remove this Lynis installation.')"
-      ACTION=$(hybrid_menu "$(translate 'Lynis Management')" "$action_text" 20 70 2 \
-        "audit" "$(translate 'Run security audit now')" \
-        "cancel" "$(translate 'Cancel')" \
-      ) || ACTION="cancel"
-    fi
+    ACTION=$(hybrid_menu "$(translate 'Lynis Management')" "$action_text" 20 70 5 \
+      "audit" "$(translate 'Run security audit now')" \
+      "update" "$(translate 'Update Lynis to latest version')" \
+      "reinstall" "$(translate 'Reinstall Lynis')" \
+      "remove" "$(translate 'Uninstall Lynis')" \
+      "cancel" "$(translate 'Cancel')" \
+    ) || ACTION="cancel"
 
     case "$ACTION" in
       audit)

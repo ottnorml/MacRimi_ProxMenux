@@ -12,7 +12,7 @@
   },
   "intro": {
     "title": "Vad detta gör",
-    "body": "Installerar Lynis, CISOfys säkerhetsgranskare med öppen källkod, från dess GitHub-arkiv till <code>/opt/lynis</code> och skapar ett startskript i <code>/usr/local/bin/lynis</code> så att det nås via <code>PATH</code>. En befintlig installation ger i stället en meny för granskning, uppdatering, ominstallation eller borttagning. Pakethanterade Lynis-installationer upptäcks och kan granskas, men Git-specifika uppdaterings- och borttagningsåtgärder är inte tillgängliga."
+    "body": "Installerar Lynis, CISOfys säkerhetsgranskare med öppen källkod, från dess GitHub-arkiv till <code>/opt/lynis</code> och skapar ett startskript i <code>/usr/local/bin/lynis</code> så att det nås via <code>PATH</code>. En befintlig installation ger i stället en meny för granskning, uppdatering, ominstallation eller borttagning."
   },
   "manageMenu": {
     "heading": "Hanteringsmeny (efter installation)",
@@ -112,7 +112,7 @@
       },
       {
         "actionRich": "<strong>Ta bort</strong>",
-        "whatRich": "Tar bort ProxMenux Git-katalog i <code>/opt/lynis</code> och dess verifierade startskript i <code>/usr/local/bin/lynis</code>. Granskningsloggar i <code>/var/log/lynis*</code> sparas. Pakethanterad Lynis i <code>/usr/sbin/lynis</code> tas inte bort."
+        "whatRich": "Ta bort <code>/opt/lynis</code> och <code>/usr/local/bin/lynis</code>. Loggar på <code>/var/log/lynis*</code> hålls (de är revisionshistorik). En apt-installerad Lynis på <code>/usr/sbin/lynis</code> lämnas orörd."
       }
     ]
   },
@@ -130,7 +130,7 @@
     "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "Granskningen visar \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "SSH daemon tillåter för många auth försök per anslutning. Antingen installera <link>Fail2Ban</link> från ProxMenux (som sätter <code>MaxAuthTries=3</code> automatiskt) eller redigera <code>/etc/ssh/sshd_config</code> för hand:",
-    "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
+    "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
     "scoreTitle": "Score gick ner efter en Proxmox uppgradering",
     "scoreBody": "Kör <code>lynis update info</code> först - en Lynis-uppdatering kan ha lagt till nya kontroller som flaggar befintlig konfig. Uppdatera Lynis från menyn, re-audit och adressera de nya resultaten."
   },

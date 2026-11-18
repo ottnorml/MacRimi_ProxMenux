@@ -12,7 +12,7 @@
   },
   "intro": {
     "title": "Qué hace",
-    "body": "Instala Lynis, el auditor de código abierto de CISOfy, desde su repositorio GitHub en <code>/opt/lynis</code> y crea un script lanzador en <code>/usr/local/bin/lynis</code> para incluirlo en <code>PATH</code>. Si detecta una instalación existente al abrirlo, muestra un menú de auditoría, actualización, reinstalación o eliminación. Las instalaciones de Lynis gestionadas por paquetes se detectan y permiten auditorías, pero no las acciones Git de actualización y eliminación."
+    "body": "Instala Lynis, el auditor de código abierto de CISOfy, desde su repositorio GitHub en <code>/opt/lynis</code> y crea un script lanzador en <code>/usr/local/bin/lynis</code> para incluirlo en <code>PATH</code>. Si detecta una instalación existente al abrirlo, muestra un menú de auditoría, actualización, reinstalación o eliminación."
   },
   "manageMenu": {
     "heading": "Menú de gestión (tras instalar)",
@@ -59,7 +59,8 @@
       "<code>/opt/lynis/lynis</code> — ruta directa (por si el wrapper se eliminó)",
       "<code>/usr/sbin/lynis</code> — versión instalada por apt, si el usuario la instaló así anteriormente"
     ],
-    "outro": "Una instalación Git de ProxMenux verificada ofrece auditoría, actualización, reinstalación y eliminación. Las instalaciones externas o gestionadas por paquetes solo permiten auditorías; utiliza su gestor de paquetes para actualizarlas o eliminarlas."
+    "outro": "Una instalación Git de ProxMenux verificada ofrece auditoría, actualización, reinstalación y eliminación. Las instalaciones externas o gestionadas por paquetes solo permiten auditorías; utiliza su gestor de paquetes para actualizarlas o eliminarlas.",
+    "outsideNote": "Un Lynis instalado de otro modo, como el paquete de Debian o el repositorio APT de CISOfy, solo se audita: el menú y el Monitor ejecutan su auditoría, y se actualiza y se elimina del mismo modo que se instaló."
   },
   "audit": {
     "heading": "Ejecutar una auditoría",
@@ -112,7 +113,7 @@
       },
       {
         "actionRich": "<strong>Eliminar</strong>",
-        "whatRich": "Elimina el repositorio Git de ProxMenux en <code>/opt/lynis</code> y su lanzador verificado en <code>/usr/local/bin/lynis</code>. Conserva los registros de <code>/var/log/lynis*</code>. No elimina Lynis gestionado por paquetes en <code>/usr/sbin/lynis</code>."
+        "whatRich": "Borra <code>/opt/lynis</code> y <code>/usr/local/bin/lynis</code>. Los logs en <code>/var/log/lynis*</code> se mantienen (son historial de auditoría). Un Lynis instalado por apt en <code>/usr/sbin/lynis</code> se deja sin tocar."
       }
     ]
   },
@@ -130,7 +131,7 @@
     "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "La auditoría muestra \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "El demonio SSH permite demasiados intentos de autenticación por conexión. O bien instala <link>Fail2Ban</link> desde ProxMenux (que establece <code>MaxAuthTries=3</code> automáticamente) o edita <code>/etc/ssh/sshd_config</code> a mano:",
-    "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
+    "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
     "scoreTitle": "La puntuación bajó tras una actualización de Proxmox",
     "scoreBody": "Ejecuta <code>lynis update info</code> primero — una actualización de Lynis puede haber añadido controles nuevos que marcan configuración existente. Actualiza Lynis desde el menú, vuelve a auditar y atiende los nuevos hallazgos."
   },

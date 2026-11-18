@@ -1,4 +1,113 @@
 {
+  "catalog": {
+    "searchPlaceholder": "Pesquisar apps e ferramentas…",
+    "settings": "Configurações do catálogo",
+    "settingsIncludeCs": "Incluir Community Scripts",
+    "settingsIncludeCsHint": "Mostra os scripts deles na pesquisa, nas seções, nas categorias e nos apps em destaque.",
+    "settingsBroad": "Pesquisa ampla",
+    "settingsBroadHint": "Encontra também o que menciona as palavras na descrição ou na categoria, depois das correspondências pelo nome.",
+    "featured": "Em destaque",
+    "featuredOpen": "Ver detalhes",
+    "categories": "Categorias de apps",
+    "allApps": "Todos os apps",
+    "toolsPmx": "Ferramentas do ProxMenux",
+    "thirdParty": "Terceiros",
+    "publisherOfficial": "Oficial",
+    "publisherOfficialHint": "Imagem publicada pelo próprio projeto",
+    "toolsCs": "Ferramentas do Community Scripts",
+    "externalScripts": "Scripts externos",
+    "addonInGuest": "Em um LXC ou VM existente",
+    "addonOnHost": "No host Proxmox",
+    "plugins": "Plugins do ProxMenux",
+    "pluginsSoon": "Em breve",
+    "groups": {
+      "apps": "Apps",
+      "tools": "Ferramentas"
+    },
+    "itemsCount": "{count} itens",
+    "noResults": "Nada corresponde a “{query}”.",
+    "back": "Catálogo",
+    "emptyView": "Ainda não há nada aqui.",
+    "sourceOci": "OCI manager Apps",
+    "sourceCs": "Community Scripts",
+    "tested": "Testado",
+    "updateable": "Atualizável",
+    "stack": "Vários contêineres",
+    "oneContainer": "1 contêiner",
+    "loadError": "Não foi possível carregar o catálogo. Tente novamente em instantes.",
+    "terminalInstall": "Instalar {name}",
+    "terminalRun": "Executar {name}",
+    "terminalOpen": "Abrir {name}",
+    "terminalDescription": "Os mesmos passos que no menu do ProxMenux.",
+    "type": {
+      "lxc": "LXC",
+      "vm": "VM",
+      "host": "Host",
+      "addon": "Add-on"
+    },
+    "sheet": {
+      "whatItIs": "O que é",
+      "whatItDoes": "O que faz",
+      "alsoAvailable": "Também disponível",
+      "imageSource": "Fonte da imagem",
+      "containersCreated": "Contêineres criados ({count})",
+      "containersIntro": "Cada serviço roda em seu próprio LXC. O ProxMenux os instala e os gerencia juntos, como um único aplicativo.",
+      "mainContainer": "Principal",
+      "publisher": "Publicada por",
+      "thirdPartyLink": "Ver projeto",
+      "usesThirdParty": "Usa um script de terceiros: {name}.",
+      "settingsApplied": "Ajustes aplicados ({count})",
+      "settingsOffered": "Ajustes que você pode escolher ({count})",
+      "whereInMenu": "Onde está no menu",
+      "notes": "Notas",
+      "defaultLogin": "Acesso padrão",
+      "user": "Usuário",
+      "password": "Senha",
+      "suggested": "Instalação sugerida",
+      "scriptResources": "Recursos do script",
+      "cores": "núcleos",
+      "ram": "RAM",
+      "swap": "swap",
+      "disk": "disco",
+      "system": "sistema",
+      "access": "Acesso",
+      "accessPort": "Porta {port} no IP do contêiner",
+      "storage": "Armazenamento",
+      "volume": "volume do contêiner de {size} GB",
+      "volumeOrHost": "volume do contêiner ou pasta do host",
+      "hostFolder": "pasta do host",
+      "image": "Imagem",
+      "config": "Configuração",
+      "script": "Script",
+      "viewCode": "Ver código",
+      "version": "Versão",
+      "links": "Links",
+      "website": "Site oficial",
+      "documentation": "Documentação",
+      "repository": "Código-fonte",
+      "install": "Instalar",
+      "installAdvanced": "Instalação avançada",
+      "runScript": "Executar script",
+      "createVm": "Criar VM",
+      "addonNote": "É instalado em um LXC ou VM que você já tem; não cria um novo.",
+      "requiresNvidia": "Precisa de uma GPU NVIDIA com o driver instalado no host Proxmox; pode ser instalado em Hardware: GPUs e Coral-TPU no menu do ProxMenux. A instalação dá ao contêiner acesso à GPU para CUDA.",
+      "optionalGpu": "Pode usar uma GPU para aceleração por hardware. A instalação pergunta se deve ativá-la.",
+      "proxmenuxDocs": "Documentação do ProxMenux",
+      "releases": "Versões disponíveis",
+      "suiteApps": "Aplicativos para escolher",
+      "byDefault": "Selecionado por padrão",
+      "suiteDefaults": "Os marcados já vêm selecionados; cada um fica em seu próprio LXC.",
+      "mediaServer": "Servidor de mídia",
+      "mediaServerChoice": "{players} ou nenhum",
+      "defaultSettings": "Configuração padrão",
+      "open": "Abrir",
+      "scriptBy": "Script de",
+      "moreInfo": "Para mais informações, visite",
+      "unprivileged": "LXC sem privilégios",
+      "privileged": "LXC com privilégios",
+      "loadError": "Não foi possível carregar os detalhes."
+    }
+  },
   "_meta": "Community translation target. Copy keys from ../en/common.json and translate the values.",
   "app": {
     "title": "ProxMenux Monitor",
@@ -17,6 +126,7 @@
   },
   "actions": {
     "refresh": "Atualizar",
+    "retry": "Tentar novamente",
     "toggleTheme": "Alternar tema",
     "openUserMenu": "Abrir menu do usuário",
     "cancel": "Cancelar",
@@ -33,6 +143,7 @@
   "navigation": {
     "overview": "Visão geral",
     "apps": "Apps",
+    "catalog": "Catálogo",
     "storage": "Armazenar",
     "network": "Rede",
     "virtualMachines": "VMs e LXCs",
@@ -1407,23 +1518,23 @@
       "osUpToDate": "SO atualizado",
       "osStatusUnavailable": "Não foi possível determinar o estado das atualizações do sistema operativo.",
       "installedByHelperPrefix": "Instalado por",
-      "helperScriptsName": "Proxmox VE Helper-Scripts",
+      "helperScriptsName": "Community Scripts",
       "helperCommandEditHint": "Se modificar este comando de arranque, será guardado como comando personalizado.",
       "customOnlineDescription": "Ou utilize um script online fornecido pelo programador:",
       "customOnlineExampleNote": "Substitua o URL de exemplo pelo do script oficial da sua aplicação.",
       "customExamplesHeading": "Exemplos para adaptar:",
       "updaterChoiceHint": "Escolha e guarde um método de atualização.",
       "updaterMethodLabel": "Método de atualização",
-      "helperMethod": "Helper-Scripts",
+      "helperMethod": "Community Scripts",
       "customMethod": "Comando personalizado",
-      "helperMethodHelp": "Sobre Helper-Scripts",
+      "helperMethodHelp": "Sobre Community Scripts",
       "customMethodHelp": "Sobre comandos personalizados",
-      "helperDetectedChoice": "Foi detetado um atualizador Helper-Scripts para esta aplicação.",
-      "helperUnavailableChoice": "O atualizador Helper-Scripts selecionado já não está disponível.",
+      "helperDetectedChoice": "Foi detetado um atualizador Community Scripts para esta aplicação.",
+      "helperUnavailableChoice": "O atualizador Community Scripts selecionado já não está disponível.",
       "disableUpdater": "Desativar",
       "disableUpdaterConfirm": "Desativar o método de atualização de {name}? Os planos e agendamentos manterão as seleções, mas esta aplicação não será executada até configurar novamente um método.",
       "noUpdaterSelected": "Não selecionou um método de atualização.",
-      "helperMethodDescription": "O ProxMenux executa o atualizador detetado dentro deste LXC e mostra o registo e o resultado. Este é mantido pelo Proxmox VE Helper-Scripts.",
+      "helperMethodDescription": "O ProxMenux executa o atualizador detetado dentro deste LXC e mostra o registo e o resultado. Este é mantido pelo Community Scripts.",
       "customMethodDescription": "Pode utilizar o atualizador da aplicação, um gestor de pacotes ou um novo binário. O comando é executado dentro deste LXC com privilégios de administrador.",
       "updaterInstructions": "Consulte as instruções do atualizador.",
       "helperDocumentation": "Documentação de atualização",
@@ -1437,7 +1548,7 @@
       "customPackageDescription": "Substitua my-package pelo pacote que pretende atualizar.",
       "customBinaryTitle": "Binário",
       "customBinaryDescription": "Primeiro transfira e verifique o binário oficial da versão e arquitetura corretas em /tmp/my-app.new. Este exemplo conserva uma cópia do binário anterior e reinicia o respetivo serviço.",
-      "helperUpdatesRun": "Instalado pelo Proxmox Helper-Scripts.",
+      "helperUpdatesRun": "Instalado pelo Community Scripts.",
       "installedPrefix": "instalado",
       "upstreamAvailable": "versão {version} disponível",
       "upToDateAt": "Atualizado em",
@@ -2208,6 +2319,7 @@
         "smart_test_complete": "Teste SMART concluído",
         "smart_test_failed": "O teste SMART falhou",
         "gpu_mode_switch": "Modo GPU alterado",
+        "custom": "Notificações de scripts e API",
         "gpu_passthrough_blocked": "Passagem de GPU bloqueada",
         "pci_passthrough_conflict": "Conflito de dispositivo PCIe",
         "load_high": "Alta carga do sistema",
@@ -2739,7 +2851,147 @@
     "avatarHint": "PNG, JPEG, WebP ou GIF · até 2 MB · pré-corte quadrado para obter melhores resultados.",
     "settingUp": "Configurando...",
     "setupAuthentication": "Configurar autenticação",
-    "back": "Voltar"
+    "back": "Voltar",
+    "setupCode": "Código de configuração",
+    "setupCodeHint": "Ele foi exibido no console quando o ProxMenux foi instalado. Se você não o tem, execute menu no servidor e abra Configurações → Mostrar código de configuração do Monitor.",
+    "codeInvalid": "O código de configuração não é válido.",
+    "codeRateLimited": "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+    "noPasswordTitle": "Sem senha",
+    "noPasswordDescription": "Escolha o que qualquer pessoa que acessar este endereço pode fazer.",
+    "readOnlyTitle": "Somente leitura",
+    "readOnlyDescription": "Qualquer pessoa que acessar o Monitor pode visualizá-lo, mas não pode abrir terminais, executar scripts ou alterar nada. Você pode adicionar uma senha mais tarde.",
+    "openTitle": "Aberto, aceitando o risco",
+    "openDescription": "Qualquer pessoa que acessar o Monitor terá controle total deste servidor, incluindo terminal root. Escolha isso apenas em uma rede onde você confia em todos que possam acessá-la.",
+    "chooseReadOnly": "Usar somente leitura",
+    "chooseOpen": "Abrir sem senha",
+    "pveTitle": "Ou use as contas do Proxmox VE",
+    "pveDescription": "Faça login com os usuários e realms do Proxmox VE e a autenticação de dois fatores deles, sem precisar de uma conta própria do Monitor.",
+    "choosePve": "Usar contas do Proxmox VE"
+  },
+  "pveAccounts": {
+    "title": "Contas do Proxmox VE",
+    "description": "Faça login com os usuários e realms do Proxmox VE, incluindo a autenticação de dois fatores deles.",
+    "enable": "Permitir login com contas do Proxmox VE",
+    "onlyWay": "As contas do Proxmox VE são a forma de acessar o painel. Para deixar de usá-las, adicione uma senha local ou escolha o acesso somente leitura ou aberto acima.",
+    "whoGetsIn": "Usuários com o privilégio Sys.Modify em / obtêm acesso total; usuários apenas com Sys.Audit em /, acesso somente leitura. Outros usuários não podem fazer login.",
+    "sharedSession": "Já fez login na interface web do Proxmox VE? Abra o painel via HTTPS no mesmo endereço e essa sessão também conectará você aqui.",
+    "saveFailed": "Não foi possível salvar a alteração.",
+    "rulesTitle": "Perfis das contas do Proxmox VE",
+    "rulesHelp": "A regra de um usuário prevalece; caso contrário, vale a primeira regra de um dos seus grupos. Sem regra, Sys.Modify em / dá o perfil Administrador e Sys.Audit o perfil Observador. Uma regra nunca deixa entrar um usuário sem privilégios em /.",
+    "ruleKind": "Regra para",
+    "ruleName": "Usuário ou grupo",
+    "kindUser": "Usuário",
+    "kindGroup": "Grupo",
+    "chooseName": "Escolher…",
+    "addRule": "Adicionar regra",
+    "removeRule": "Remover",
+    "moveUp": "Subir",
+    "moveDown": "Descer",
+    "saveRules": "Salvar regras",
+    "rulesSaved": "Regras salvas.",
+    "errors": {
+      "pve_rules_invalid": "Não foi possível salvar as regras.",
+      "pve_name_invalid": "Escolha um usuário ou grupo válido.",
+      "pve_user_realm": "Informe o usuário com o seu realm, como usuario@pve.",
+      "pve_rule_duplicate": "Cada usuário ou grupo pode ter apenas uma regra.",
+      "pve_rule_self": "Essas regras removeriam o seu acesso de administrador."
+    }
+  },
+  "users": {
+    "title": "Usuários",
+    "description": "Usuários locais do Monitor, cada um com sua senha, sua autenticação de dois fatores e seu perfil.",
+    "you": "Você",
+    "primary": "Principal",
+    "profile": "Perfil",
+    "profiles": {
+      "admin": "Administrador",
+      "operator": "Operador com terminal",
+      "operator_no_terminal": "Operador sem terminal",
+      "observer": "Observador",
+      "custom": "Personalizado"
+    },
+    "profileHints": {
+      "admin": "tudo, incluindo os usuários, as configurações do Monitor e os segredos.",
+      "operator": "executa scripts e ferramentas, controla VMs e LXC, gerencia backups, atualiza e abre terminais.",
+      "operator_no_terminal": "o mesmo que um operador com terminal, sem abrir terminais.",
+      "observer": "vê o painel sem segredos; não executa nem altera nada.",
+      "custom": "as áreas que vê e as ações que pode fazer, escolhidas uma a uma; nunca administra."
+    },
+    "add": "Adicionar usuário",
+    "username": "Nome de usuário",
+    "usernameHint": "Até 32 letras, números, pontos, hífens e sublinhados.",
+    "password": "Senha",
+    "confirmPassword": "Confirmar senha",
+    "newPassword": "Nova senha",
+    "setPassword": "Definir senha",
+    "removeTotp": "Remover 2FA",
+    "remove": "Remover",
+    "confirmRemove": "Remover usuário",
+    "removeHint": "As sessões e os tokens de API dele deixam de funcionar.",
+    "passwordsDiffer": "As senhas não coincidem.",
+    "added": "Usuário adicionado.",
+    "passwordSet": "Senha salva.",
+    "profileChanged": "Perfil salvo. Ele se aplica na hora às sessões abertas.",
+    "totpRemoved": "Autenticação de dois fatores removida. Ela pode ser configurada de novo em Segurança.",
+    "removed": "Usuário removido.",
+    "errors": {
+      "username_invalid": "O nome de usuário pode ter até 32 letras, números, pontos, hífens e sublinhados.",
+      "username_taken": "Esse nome de usuário já está em uso.",
+      "profile_unknown": "Perfil desconhecido.",
+      "last_admin": "O Monitor precisa de pelo menos um administrador.",
+      "user_not_found": "Esse usuário não existe mais.",
+      "remove_self": "Você não pode remover sua própria conta.",
+      "password_short": "A senha deve ter pelo menos 10 caracteres.",
+      "password_mix": "A senha deve combinar pelo menos três entre: minúsculas, maiúsculas, números e símbolos.",
+      "password_common": "Essa senha é comum demais. Escolha outra.",
+      "user_change_failed": "Não foi possível salvar a alteração.",
+      "custom_invalid": "Escolha pelo menos uma área.",
+      "disable_self": "Você não pode desativar sua própria conta."
+    },
+    "customAreas": "Áreas visíveis",
+    "customActions": "Ações permitidas",
+    "customHint": "Segurança, Configurações e a própria conta estão sempre disponíveis. Administrar é exclusivo do perfil Administrador.",
+    "customize": "Alterar áreas",
+    "noActions": "sem ações",
+    "areas": {
+      "general": "Visão geral",
+      "apps": "Apps",
+      "menux": "Menux",
+      "guests": "VMs e LXCs",
+      "node": "Nó (armazenar, rede, hardware)",
+      "backup": "Backup",
+      "logs": "Registros do sistema"
+    },
+    "actions": {
+      "execute": "Executar scripts e ferramentas",
+      "guests": "Controlar VMs e LXC",
+      "backup": "Gerenciar backups",
+      "update": "Atualizar",
+      "terminal": "Abrir terminais"
+    },
+    "disable": "Desativar",
+    "enable": "Ativar",
+    "disabledBadge": "Desativado",
+    "disabledDone": "Usuário desativado: não pode fazer login, e as sessões e os tokens de API dele deixam de funcionar até que seja ativado de novo.",
+    "enabledDone": "Usuário ativado."
+  },
+  "pveLogin": {
+    "tab": "Proxmox VE",
+    "localAccount": "Conta local",
+    "username": "Usuário",
+    "password": "Senha",
+    "realm": "Realm",
+    "code": "Código de dois fatores",
+    "codeHint": "O código de seis dígitos do seu aplicativo autenticador ou uma das suas chaves de recuperação.",
+    "failed": "Falha no login. Verifique o usuário, senha e realm.",
+    "fillFields": "Insira o usuário e a senha.",
+    "tooManyAttempts": "Muitas tentativas. Aguarde alguns minutos e tente novamente.",
+    "useWebInterface": "Esta conta faz login com uma chave de segurança. Entre na interface web do Proxmox VE e depois volte para esta página.",
+    "webInterface": "Entrar na interface web do Proxmox VE",
+    "webInterfaceHint": "Com o Monitor aberto via HTTPS no mesmo endereço, a sessão da interface web do Proxmox VE conecta você aqui ao retornar."
+  },
+  "access": {
+    "readOnlyBanner": "Acesso somente leitura: você pode visualizar este servidor, mas não executar nem alterar nada. Para gerenciá-lo, adicione uma senha em Security."
   },
   "securityPage": {
     "title": "Segurança",
@@ -2773,7 +3025,8 @@
       "none": "Nenhum",
       "external": "Externo",
       "up": "Acima",
-      "down": "Abaixo"
+      "down": "Abaixo",
+      "readOnly": "Somente leitura"
     },
     "errors": {
       "deleteReportNoFiles": "Nenhum arquivo de relatório ou log do Lynis foi encontrado para remoção.",
@@ -2849,7 +3102,8 @@
       "sslCertificateReloaded": "O certificado renovado está agora ativo. As ligações existentes não foram interrompidas.",
       "sslCertificateUnchanged": "O certificado ativo já corresponde aos ficheiros de certificado atuais.",
       "reportDeleted": "O relatório de auditoria foi excluído.",
-      "twoFactorEnabled": "A autenticação de dois fatores está habilitada."
+      "twoFactorEnabled": "A autenticação de dois fatores está habilitada.",
+      "readOnlyReloading": "O painel agora é somente leitura. Recarregando..."
     },
     "confirm": {
       "disableAuth": "Desativar autenticação? Qualquer pessoa que conseguir acessar o painel poderá abri-lo.",
@@ -2884,7 +3138,11 @@
       "confirmNewPasswordPlaceholder": "Digite a nova senha novamente",
       "changing": "Mudando...",
       "enterYourPassword": "Digite sua senha",
-      "disable": "Desabilitar autenticação"
+      "disable": "Desabilitar autenticação",
+      "readOnlyMode": "O painel é somente leitura sem senha: ele pode ser visualizado, mas nada pode ser executado ou alterado.",
+      "useReadOnly": "Mudar para somente leitura",
+      "disableChoose": "Sem uma senha, como o painel deve ser acessado?",
+      "pveMode": "O painel faz login com as contas do Proxmox VE."
     },
     "twoFactor": {
       "title": "Autenticação de dois fatores",
@@ -3173,6 +3431,7 @@
       "featureGithub": "relatório claro que você pode imprimir ou salvar",
       "install": "Instale o Lynis",
       "installedDescription": "Lynis está instalado e pronto para auditar este host.",
+      "installedOutside": "Lynis está instalado e pronto para auditar este host. Não foi instalado pelo ProxMenux, por isso é atualizado e removido da mesma forma como foi instalado.",
       "lastScan": "Última verificação",
       "hardeningIndex": "Índice de endurecimento",
       "warnings": "Avisos",
@@ -5345,6 +5604,8 @@
       "storageAvailable": "O armazenamento {type} está disponível",
       "storageUsage": "{percent}% em uso",
       "mountReachable": "A montagem {type} está acessível",
+      "mountReachableReadOnly": "A montagem {type} está acessível, somente leitura",
+      "mountReadOnlyConfiguredRw": "A montagem {type} está somente leitura, mas configurada para leitura e gravação",
       "rootfsUsed": "Uso de rootfs: {percent}% ({size})",
       "runningCtsSafe": "{count} CTs em execução têm uso seguro de rootfs",
       "pveStorageSafe": "{count} Os alvos de armazenamento em bloco PVE têm uso seguro",
@@ -5516,6 +5777,7 @@
     "iosDescription": "Adicione o monitor à sua tela inicial para acesso rápido.",
     "androidDescription": "Adicione o Monitor como um aplicativo para que ele abra como um aplicativo normal.",
     "addToHomeScreen": "Adicionar à tela inicial",
+    "installApp": "Instalar app",
     "ios": {
       "stepShareBefore": "Toque no",
       "share": "Compartilhar",
@@ -5528,10 +5790,17 @@
     "android": {
       "stepOpenMenu": "Abra o menu do navegador",
       "stepConfirm": "confirme tocando",
-      "install": "Instalar"
+      "install": "Instalar",
+      "or": "ou"
     },
     "notNow": "Agora não",
-    "neverAgain": "Não mostre novamente"
+    "neverAgain": "Não mostre novamente",
+    "insecure": {
+      "description": "Por HTTP sem criptografia, o Chrome só pode adicionar um atalho à tela inicial.",
+      "howTo": "Para instalar o Monitor como aplicativo, abra-o por HTTPS com um certificado válido: um certificado ACME do Proxmox em Administrador → Segurança, um proxy reverso ou o Tailscale.",
+      "docs": "Como configurar o HTTPS",
+      "shortcut": "Enquanto isso, você pode adicionar um atalho:"
+    }
   },
   "vmMetrics": {
     "title": "Métricas — {name}",
@@ -5681,6 +5950,7 @@
     }
   },
   "terminal": {
+    "rotateHint": "Gire o celular na horizontal para ver os menus do ProxMenux por completo.",
     "connected": "Conectado",
     "disconnected": "Desconectado",
     "terminalCount": "{count} / 4 terminais",
@@ -5839,34 +6109,40 @@
     "customLinkSaveError": "Save failed",
     "customLinkDeleteError": "Delete failed",
     "categoryLabels": {
-      "arrSuite": "*Arr Suite",
-      "aiCodingDevTools": "IA / Programação e ferramentas de desenvolvimento",
-      "adblockDns": "Adblock & DNS",
-      "authenticationSecurity": "Authentication & Security",
-      "automationScheduling": "Automation & Scheduling",
-      "backupRecovery": "Backup & Recovery",
-      "businessErp": "Business & ERP",
-      "communicationCommunity": "Communication & Community",
-      "containersDocker": "Containers & Docker",
-      "dashboardsFrontends": "Dashboards & Frontends",
-      "databases": "Databases",
-      "documentsNotes": "Documents & Notes",
-      "filesDownloads": "Files & Downloads",
-      "financeBudgeting": "Finance & Budgeting",
-      "gamingLeisure": "Gaming & Leisure",
-      "hostManagement": "Host Management",
+      "arrSuite": "Suíte *Arr",
+      "aiCodingDevTools": "IA, programação e ferramentas de desenvolvimento",
+      "adblockDns": "Bloqueio de anúncios e DNS",
+      "authenticationSecurity": "Autenticação e segurança",
+      "automationScheduling": "Automação e agendamento",
+      "backupRecovery": "Backup e recuperação",
+      "businessErp": "Empresas e ERP",
+      "communicationCommunity": "Comunicação e comunidade",
+      "containersDocker": "Contêineres e Docker",
+      "dashboardsFrontends": "Painéis e interfaces",
+      "databases": "Bancos de dados",
+      "documentsNotes": "Documentos e notas",
+      "filesDownloads": "Arquivos e downloads",
+      "downloads": "Downloads",
+      "financeBudgeting": "Finanças e orçamento",
+      "gamingLeisure": "Jogos e lazer",
+      "hostManagement": "Gerenciamento do host",
       "iotSmartHome": "IoT e casa inteligente",
-      "mediaStreaming": "Media & Streaming",
-      "messagingNotifications": "Messaging & Notifications",
-      "miscellaneous": "Miscellaneous",
-      "monitoringAnalytics": "Monitoring & Analytics",
-      "nvrCameras": "NVR & Cameras",
-      "networkFirewall": "Network & Firewall",
-      "operatingSystemsAppliances": "Sistemas operativos e dispositivos virtuais",
-      "productivityWorkflows": "Productivity & Workflows",
+      "mediaStreaming": "Mídia e streaming",
+      "messagingNotifications": "Mensagens e notificações",
+      "miscellaneous": "Diversos",
+      "monitoringAnalytics": "Monitoramento e análise",
+      "nvrCameras": "NVR e câmeras",
+      "networkFirewall": "Rede e firewall",
+      "operatingSystemsAppliances": "Sistemas operacionais e appliances",
+      "productivityWorkflows": "Produtividade e fluxos de trabalho",
       "remoteAccessVpn": "Acesso remoto e VPN",
-      "webserversProxies": "Webservers & Proxies",
-      "zigbeeZwaveMatter": "ZigBee, Z-Wave e Matter"
+      "webserversProxies": "Servidores web e proxies",
+      "zigbeeZwaveMatter": "ZigBee, Z-Wave e Matter",
+      "creativeDesign": "Criatividade e design",
+      "filesSharing": "Arquivos e compartilhamento",
+      "browsersWebDesktops": "Navegadores e desktops web",
+      "tools": "Ferramentas",
+      "messagingQueues": "Mensageria e filas"
     },
     "emptyTitle": "Nenhum aplicativo com um link web ainda.",
     "emptyHint": "Registre um Web Link para qualquer aplicativo (App tab de um CT) para vê-lo aqui.",
@@ -6983,6 +7259,10 @@
   },
   "runtime": {
     "notifications": {
+      "cluster": {
+        "rejoinedBody": "O nó {node_name} perdeu o contacto com o cluster e voltou a entrar após {seconds} s.",
+        "restartedBody": "O Corosync, o serviço de comunicação do cluster, foi parado no nó {node_name} e iniciado novamente. O nó voltou a entrar no cluster após {seconds} s."
+      },
       "templates": {
         "state_change": {
           "title": "{hostname}: {category} alterado para {current}{entity_suffix}",
@@ -7364,6 +7644,11 @@
           "body": "Informações do pacote upstream encaminhadas por Proxmox VE por meio de apt-listchanges. O texto a seguir vem do mantenedor do pacote e não é uma recomendação ProxMenux.\n\n{reason}",
           "label": "avisos do pacote apt-listchanges"
         },
+        "custom": {
+          "title": "{title}",
+          "body": "{message}",
+          "label": "Notificações de scripts e API"
+        },
         "webhook_test": {
           "title": "{hostname}: teste de webhook recebido",
           "body": "Teste de conectividade do webhook PVE bem-sucedido.\n{reason}",
@@ -7505,8 +7790,8 @@
           "label": "Explosão de problemas do sistema"
         },
         "burst_generic": {
-          "title": "{hostname}: +{count} mais eventos {event_type} em {window}",
-          "body": "+{count} eventos adicionais do tipo {event_type} em {window} ({total_count} total).\n\nEventos adicionais:\n{details}",
+          "title": "{hostname}: {event_type} (+{count} a mais em {window})",
+          "body": "{event_type}: {count} a mais em {window} ({total_count} no total).\n\nEventos adicionais:\n{details}",
           "label": "Explosão genérica"
         },
         "kernel_warning": {
@@ -7985,6 +8270,117 @@
     "unexpectedContentType": "Era esperada uma resposta JSON, mas foi recebido {contentType}",
     "unknownContentType": "tipo de conteúdo desconhecido",
     "invalidJson": "Resposta JSON inválida de {endpoint}",
-    "unauthorized": "Não autorizado: {endpoint}"
+    "unauthorized": "Não autorizado: {endpoint}",
+    "forbidden": "Seu perfil não permite esta ação."
+  },
+  "accessLog": {
+    "title": "Atividade de acesso",
+    "description": "Logins, alterações em contas, perfis e configurações de login, e cada ação que um perfil recusou, com quem a fez. Senhas, códigos e tokens nunca são registrados. Mantido por 90 dias.",
+    "empty": "Ainda não há atividade registrada.",
+    "loadMore": "Carregar mais",
+    "refused": "Recusada",
+    "failed": "Falhou",
+    "noAccount": "Sem conta",
+    "secondFactor": "segundo fator",
+    "missing": "falta: {permission}",
+    "on": "ativado",
+    "off": "desativado",
+    "rules": "regras: {count}",
+    "subjects": "identificadores: {count}",
+    "events": {
+      "login": "Login",
+      "account": {
+        "created": "Conta criada"
+      },
+      "access": {
+        "mode": "Modo de acesso alterado",
+        "refused": "Ação recusada"
+      },
+      "password": {
+        "changed": "Senha alterada"
+      },
+      "totp": {
+        "enabled": "Autenticação de dois fatores ativada",
+        "disabled": "Autenticação de dois fatores desativada"
+      },
+      "api_token": {
+        "created": "Token de API criado",
+        "revoked": "Token de API revogado"
+      },
+      "user": {
+        "created": "Usuário adicionado",
+        "profile": "Perfil alterado",
+        "password": "Senha definida por um administrador",
+        "totp_reset": "Autenticação de dois fatores removida",
+        "deleted": "Usuário removido",
+        "disabled": "Usuário desativado",
+        "enabled": "Usuário ativado"
+      },
+      "pve": {
+        "accounts": "Contas do Proxmox VE",
+        "rules": "Regras de perfis do Proxmox VE"
+      },
+      "oidc": {
+        "config": "Configurações do OpenID Connect"
+      },
+      "app_watch": {
+        "adopted": "Registros de apps retomados do contêiner"
+      }
+    },
+    "methods": {
+      "local": "conta local",
+      "pve": "Proxmox VE",
+      "oidc": "OpenID Connect"
+    },
+    "modes": {
+      "read_only": "somente leitura",
+      "open": "aberto",
+      "proxmox": "contas do Proxmox VE",
+      "password": "senha"
+    },
+    "scopes": {
+      "read_only": "somente leitura",
+      "full_admin": "acesso completo"
+    },
+    "permissions": {
+      "admin": "administrar",
+      "view": "ver",
+      "self": "a própria conta",
+      "ticket": "ticket de terminal ou download"
+    }
+  },
+  "oidc": {
+    "title": "OpenID Connect (OIDC)",
+    "description": "Inicie sessão com um fornecedor de identidade externo, como Authentik, Keycloak ou Pocket ID.",
+    "localRequired": "Configure e ative a autenticação local por palavra-passe antes de configurar OIDC.",
+    "enable": "Ativar OpenID Connect",
+    "provider_name": "Nome do fornecedor",
+    "issuer": "URL do emissor (valor exato da descoberta)",
+    "public_url": "URL HTTPS público deste painel Monitor",
+    "client_id": "ID do cliente",
+    "secret": "Segredo do cliente",
+    "secretKept": "O segredo guardado é mantido se o campo ficar vazio",
+    "authMethod": "Método de autenticação do cliente",
+    "publicClient": "Cliente público (PKCE, sem segredo)",
+    "urlHelp": "Utilize o URL exato do emissor, incluindo qualquer barra final. O URL público deve servir este painel e as suas rotas /api através de HTTPS, incluindo qualquer prefixo de caminho do proxy.",
+    "subjects": "Identificadores de sujeito dos administradores autorizados (sub), um por linha",
+    "subjectHelp": "Apenas estes IDs de utilizador imutáveis do fornecedor podem aceder ao Monitor. Cada um recebe acesso de administrador completo. Utilize a declaração sub emitida para este cliente, não um endereço de e-mail nem um nome de apresentação.",
+    "callback": "Registe exatamente este URI de redirecionamento no seu fornecedor de identidade:",
+    "mfaHelp": "OIDC usa a política MFA do fornecedor de identidade. A palavra-passe local e a 2FA continuam disponíveis. Guardar alterações invalida as sessões OIDC existentes.",
+    "unavailable": "Esta versão do Monitor não inclui o ambiente de execução criptográfico necessário para OIDC.",
+    "save": "Guardar e verificar o fornecedor",
+    "saving": "A verificar o fornecedor…",
+    "saved": "Definições OIDC guardadas. A descoberta foi verificada; teste o início de sessão noutro navegador antes de terminar a sessão local.",
+    "saveFailed": "Não foi possível guardar as definições OIDC.",
+    "login": "Continuar com {provider}",
+    "loginFailed": "O início de sessão OIDC falhou ou expirou. Tente novamente, verifique o seu identificador de sujeito autorizado ou utilize as credenciais locais.",
+    "disabledSaved": "Definições OIDC guardadas. O início de sessão externo está desativado.",
+    "saveDisabled": "Guardar definições",
+    "allowedSubjects": "Identificadores permitidos",
+    "allowedSubjectsHelp": "Somente esses identificadores de usuário imutáveis do provedor acessam o Monitor, cada um com seu perfil; um sem perfil escolhido é administrador. Use o valor sub emitido para este cliente, não um e-mail nem um nome de exibição.",
+    "subjectId": "Identificador (sub)",
+    "subjectName": "Nome (opcional)",
+    "addSubject": "Adicionar identificador",
+    "removeSubject": "Remover"
   }
 }

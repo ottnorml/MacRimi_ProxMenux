@@ -12,7 +12,7 @@
   },
   "intro": {
     "title": "Čo to robí?",
-    "body": "Nainštaluje Lynis, bezpečnostný audítor s otvoreným zdrojovým kódom od CISOfy, z jeho repozitára GitHub do <code>/opt/lynis</code> a vytvorí spúšťací skript <code>/usr/local/bin/lynis</code>, aby bol dostupný cez <code>PATH</code>. Ak rozpozná existujúcu inštaláciu, zobrazí menu auditu, aktualizácie, preinštalovania alebo odstránenia. Balíkovo spravované inštalácie Lynis sa rozpoznajú a umožňujú audit, ale Git aktualizácia a odstránenie pre ne nie sú dostupné."
+    "body": "Nainštaluje Lynis, bezpečnostný audítor s otvoreným zdrojovým kódom od CISOfy, z jeho repozitára GitHub do <code>/opt/lynis</code> a vytvorí spúšťací skript <code>/usr/local/bin/lynis</code>, aby bol dostupný cez <code>PATH</code>. Ak rozpozná existujúcu inštaláciu, zobrazí menu auditu, aktualizácie, preinštalovania alebo odstránenia."
   },
   "manageMenu": {
     "heading": "Menu správy (po inštalácii)",
@@ -112,7 +112,7 @@
       },
       {
         "actionRich": "<strong>Odstrániť</strong>",
-        "whatRich": "Odstráni Git checkout ProxMenux z <code>/opt/lynis</code> a overený spúšťací skript z <code>/usr/local/bin/lynis</code>. Auditné logy <code>/var/log/lynis*</code> zostanú zachované. Balíkový Lynis v <code>/usr/sbin/lynis</code> sa neodstráni."
+        "whatRich": "Odstráni <code>/opt/lynis</code> a <code>/usr/local/bin/lynis</code>. Záznamy na <code>/var/log/lynis*</code> sú vedené (sú audit histórie). Apt-inštalovaný Lynis na <code>/usr/sbin/lynis</code> zostáva nedotknutý."
       }
     ]
   },
@@ -130,7 +130,7 @@
     "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "Audit zobrazuje \"Warning: Test SSH-7408 — MaxAuthTries set incorrectly\"",
     "sshIntro": "Démon SSH umožňuje príliš veľa auth pokusov na pripojenie. Buď nainštalujte <link>Fail2Ban</link> z ProxMenux (ktorý nastaví <code>MaxAuthTries=3</code>), alebo editujte <code>/etc/ssh/sshd_config</code> ručne:",
-    "sshCode": "sed -i 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
+    "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
     "scoreTitle": "Skóre klesol po upgrade Proxmox",
     "scoreBody": "Najprv spustite <code>lynis update info</code>; aktualizácia Lynis mohla pridať kontroly, ktoré upozorňujú na existujúcu konfiguráciu. Aktualizujte Lynis z menu, zopakujte audit a riešte nové zistenia."
   },

@@ -53,6 +53,7 @@ import { fetchTerminalTicket } from "../lib/terminal-ws"
 import { formatStorage, formatBytes, cancelButtonClass } from "../lib/utils"
 import { getStorageUsageColor } from "../lib/storage-usage-color"
 import { useI18n, useT } from "../lib/i18n/provider"
+import { useAccess } from "../lib/access"
 
 type TFunction = (key: string, params?: Record<string, string | number>) => string
 
@@ -443,6 +444,20 @@ const formatRunAt = (iso: string | null) => {
 // belong to matches "the key is a PBS thing" without dragging in
 // the fuller management surface.
 // ──────────────────────────────────────────────────────────────
+// The keyfile is downloaded through an <a download> link, which cannot send
+// the Authorization header: a single-use ticket on the URL signs it in.
+async function downloadPbsKeyfile() {
+  const ticket = await fetchTerminalTicket()
+  let url = getApiUrl("/api/host-backups/pbs-encryption/download-keyfile")
+  if (ticket) url += `?ticket=${encodeURIComponent(ticket)}`
+  const a = document.createElement("a")
+  a.href = url
+  a.download = "pbs-key.conf"
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+}
+
 function PbsKeyfileActions({ pbsRepository }: { pbsRepository?: string }) {
   const t = useT()
   const { data: info, mutate: mutateInfo } = useSWR<{
@@ -488,16 +503,7 @@ function PbsKeyfileActions({ pbsRepository }: { pbsRepository?: string }) {
     setErr(null)
   }
 
-  const download = () => {
-    // Same plain-<a>-download trick used elsewhere: bypasses fetch so
-    // an ad-blocker or a stale SWR cache can't intervene.
-    const a = document.createElement("a")
-    a.href = "/api/host-backups/pbs-encryption/download-keyfile"
-    a.download = "pbs-key.conf"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
+  const download = downloadPbsKeyfile
 
   const runUpload = async () => {
     if (!importFile && !importPath.trim()) {
@@ -791,14 +797,7 @@ function KeyfileActionsBar({
     (pendingMode === "full" && !!pass1 && pass1 === pass2)        // passphrase update
   )
 
-  const download = () => {
-    const a = document.createElement("a")
-    a.href = "/api/host-backups/pbs-encryption/download-keyfile"
-    a.download = "pbs-key.conf"
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-  }
+  const download = downloadPbsKeyfile
 
   return (
     <div className="space-y-3">
@@ -922,6 +921,7 @@ function KeyfileActionsBar({
 }
 
 export function HostBackup() {
+  const { capabilities } = useAccess()
   const t = useT()
   const { data: jobsResp, error: jobsErr, mutate: mutateJobs } = useSWR<{ jobs: BackupJob[] }>(
     "/api/host-backups/jobs",
@@ -1063,14 +1063,14 @@ export function HostBackup() {
               {jobsResp?.jobs?.filter((j) => !j.manual).length ?? 0}
             </Badge>
           </div>
-          <Button
+          {capabilities.backup && (<Button
             size="sm"
             className="h-8 px-3 bg-blue-500 hover:bg-blue-600 text-white"
             onClick={() => setCreatingJob(true)}
           >
             <Plus className="h-4 w-4 mr-1" />
             {t("backup.jobs.createJob")}
-          </Button>
+          </Button>)}
         </CardHeader>
         <CardContent>
           {jobsErr ? (
@@ -1260,13 +1260,13 @@ export function HostBackup() {
           <p className="text-xs text-muted-foreground">
             {t("backup.manual.description")}
           </p>
-          <Button
+          {capabilities.backup && (<Button
             className="w-full sm:w-auto bg-purple-500 hover:bg-purple-600 text-white"
             onClick={() => setRunningManual(true)}
           >
             <PlayCircle className="h-4 w-4 mr-2" />
             {t("backup.manual.run")}
-          </Button>
+          </Button>)}
           {/* In-progress manual jobs. If the operator closed the
               ManualBackupDialog before the runner finished, this
               banner is the way back into the live log — clicking
@@ -1614,6 +1614,7 @@ function InspectModal({
   onClose: () => void
   onDeleted?: () => void
 }) {
+  const { capabilities } = useAccess()
   const t = useT()
   const open = archive !== null
   // Aliases to the source-specific payloads — saves on `.local!` /
@@ -2289,7 +2290,7 @@ function InspectModal({
             Restore keeps its label — the others are icon-only to fit
             the narrower viewport without wrapping. */}
         <div className="px-4 sm:px-6 py-3 border-t border-border shrink-0 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-wrap">
+          {capabilities.backup && (<div className="flex items-center gap-2 flex-wrap">
             <Button
               onClick={beginRestore}
               disabled={restorePreparing || needsKeyfile}
@@ -2327,8 +2328,8 @@ function InspectModal({
               <Eye className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">{t("backup.actions.viewContents")}</span>
             </Button>
-          </div>
-          <Button
+          </div>)}
+          {capabilities.backup && (<Button
             onClick={() => setShowDeleteArchiveConfirm(true)}
             disabled={deletingArchive}
             className="bg-red-500/10 border border-red-500/40 text-red-400 hover:bg-red-500/20 hover:text-red-300"
@@ -2347,7 +2348,7 @@ function InspectModal({
               <Trash2 className="h-4 w-4 sm:mr-2" />
             )}
             <span className="hidden sm:inline">{t("backup.actions.delete")}</span>
-          </Button>
+          </Button>)}
         </div>
       </DialogContent>
     </Dialog>
@@ -5405,6 +5406,7 @@ function DestinationsSection({
   destinations?: DestinationsResp
   onChanged: () => void
 }) {
+  const { capabilities } = useAccess()
   const t = useT()
   const [configuring, setConfiguring] = useState<boolean>(false)
   const [editingDest, setEditingDest] = useState<EditingDest | null>(null)
@@ -5609,14 +5611,14 @@ function DestinationsSection({
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <Button
+        {capabilities.backup && (<Button
           size="sm"
           className="h-8 px-3 bg-blue-500 hover:bg-blue-600 text-white"
           onClick={() => setConfiguring(true)}
         >
           <Plus className="h-4 w-4 mr-1" />
           {t("backup.destinations.configureDestination")}
-        </Button>
+        </Button>)}
       </div>
       {error && (
         <div className="text-xs text-red-500 px-3 py-2 rounded-md border border-red-500/30 bg-red-500/10 whitespace-pre-wrap break-words">
@@ -5630,7 +5632,7 @@ function DestinationsSection({
           shell — what runs after a fresh PVE install when the
           operator points the new host at the same PBS. */}
       {hasPbs && pbsRecoveryStatus && !pbsRecoveryStatus.has_keyfile && (pbsRecoveryAvailable?.snapshots?.length ?? 0) > 0 && (
-        <button
+        capabilities.backup && (<button
           type="button"
           onClick={() => setRecoveringKeyfile(true)}
           className="w-full flex items-start gap-2 px-3 py-2.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors text-left"
@@ -5646,7 +5648,7 @@ function DestinationsSection({
             </div>
           </div>
           <span className="text-xs text-emerald-300 shrink-0 self-center">{t("backup.recovery.recoverArrow")}</span>
-        </button>
+        </button>)
       )}
 
       <div className="space-y-2">
@@ -5840,6 +5842,7 @@ function DestinationRow({
   onUnmount?: () => void
   onEdit?: () => void
 }) {
+  const { capabilities } = useAccess()
   const t = useT()
   const accent =
     item.kind === "pbs" ? "bg-purple-500/10 text-purple-400 border-purple-500/20"
@@ -5946,7 +5949,7 @@ function DestinationRow({
               long headline keeps these two buttons in place. Chip
               style (square border + tinted bg) makes them read as
               actionable rather than decorative icons. */}
-          <div className="shrink-0 flex items-start gap-1.5">
+          {capabilities.backup && (<div className="shrink-0 flex items-start gap-1.5">
             {onEdit && (
               <button
                 type="button"
@@ -5984,7 +5987,7 @@ function DestinationRow({
                 {item.kind === "local" ? t("backup.destinations.builtIn") : t("backup.destinations.managedByPve")}
               </span>
             )}
-          </div>
+          </div>)}
         </div>
         {subline && (
           <p className="text-xs font-mono text-muted-foreground break-all pl-7" title={subline}>
@@ -6055,7 +6058,7 @@ function DestinationRow({
           is host-wide but conceptually belongs to PBS usage, so the
           Download / Upload / Delete controls sit next to the
           destination(s) they support. */}
-      {item.kind === "pbs" && <PbsKeyfileActions pbsRepository={item.repository} />}
+      {item.kind === "pbs" && capabilities.backup && <PbsKeyfileActions pbsRepository={item.repository} />}
     </div>
   )
 }
@@ -6975,6 +6978,7 @@ interface ExtraPathEntry {
 }
 
 function ExtraPathsSection() {
+  const { capabilities } = useAccess()
   const t = useT()
   const { data, mutate } = useSWR<{ paths: ExtraPathEntry[] }>(
     "/api/host-backups/extra-paths",
@@ -7027,7 +7031,7 @@ function ExtraPathsSection() {
         {t("backup.extraPaths.descriptionBefore")} <span className="font-medium text-foreground">{t("backup.extraPaths.everyBackup")}</span> {t("backup.extraPaths.descriptionAfter", { count: paths.length })}
       </p>
 
-        <div className="flex flex-col sm:flex-row gap-2">
+        {capabilities.backup && (<div className="flex flex-col sm:flex-row gap-2">
           <Input
             value={newPath}
             onChange={(e) => setNewPath(e.target.value)}
@@ -7043,7 +7047,7 @@ function ExtraPathsSection() {
             {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
             {t("backup.actions.addPath")}
           </Button>
-        </div>
+        </div>)}
         <p className="text-[11px] text-muted-foreground">
           {t("backup.extraPaths.absolutePathHintBefore")} <code className="font-mono">/hola</code> {t("backup.extraPaths.absolutePathHintMiddle")} <code className="font-mono">/root/hola</code> {t("backup.extraPaths.absolutePathHintAfter")}
         </p>
@@ -7073,7 +7077,7 @@ function ExtraPathsSection() {
                     </Badge>
                   )}
                 </div>
-                <button
+                {capabilities.backup && (<button
                   type="button"
                   disabled={busyPath === p.path}
                   onClick={() => removePath(p.path)}
@@ -7081,7 +7085,7 @@ function ExtraPathsSection() {
                   className="shrink-0 inline-flex items-center justify-center h-7 w-7 rounded-md border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {busyPath === p.path ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
-                </button>
+                </button>)}
               </div>
             ))}
           </div>
@@ -7154,6 +7158,7 @@ interface UsbDrive {
 }
 
 function UsbDrivesSection() {
+  const { capabilities } = useAccess()
   const t = useT()
   const { data, mutate, isLoading } = useSWR<{ drives: UsbDrive[] }>(
     "/api/host-backups/usb-drives",
@@ -7281,7 +7286,7 @@ function UsbDrivesSection() {
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {d.state === "mounted" && (
-                    <Button
+                    capabilities.backup && (<Button
                       size="sm"
                       variant="ghost"
                       className="h-8 px-2"
@@ -7290,10 +7295,10 @@ function UsbDrivesSection() {
                     >
                       {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <XCircle className="h-3.5 w-3.5" />}
                       <span className="ml-1 text-xs">{t("backup.actions.unmount")}</span>
-                    </Button>
+                    </Button>)
                   )}
                   {d.state === "unmounted" && (
-                    <Button
+                    capabilities.backup && (<Button
                       size="sm"
                       variant="ghost"
                       className="h-8 px-2"
@@ -7302,10 +7307,10 @@ function UsbDrivesSection() {
                     >
                       {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                       <span className="ml-1 text-xs">{t("backup.actions.mount")}</span>
-                    </Button>
+                    </Button>)
                   )}
                   {d.state === "empty" && (
-                    <Button
+                    capabilities.backup && (<Button
                       size="sm"
                       variant="ghost"
                       className="h-8 px-2 text-red-500 hover:text-red-400 hover:bg-red-500/10"
@@ -7315,7 +7320,7 @@ function UsbDrivesSection() {
                     >
                       <AlertTriangle className="h-3.5 w-3.5" />
                       <span className="ml-1 text-xs">{t("backup.actions.format")}</span>
-                    </Button>
+                    </Button>)
                   )}
                 </div>
               </div>
@@ -7403,6 +7408,7 @@ function JobDetailModal({
   onRequestDelete: (id: string) => void
   onChanged: () => void
 }) {
+  const { capabilities } = useAccess()
   const t = useT()
   const open = jobId !== null
   const [running, setRunning] = useState(false)
@@ -7772,7 +7778,7 @@ function JobDetailModal({
             // Edit next to it in blue outline, then state-changers on
             // the right (Disable / Delete) — both outlined to read as
             // less prominent than Run.
-            <div className="border-t border-border pt-3 flex items-center justify-between gap-2 flex-wrap">
+            capabilities.backup && (<div className="border-t border-border pt-3 flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <Button
                   size="sm"
@@ -7834,7 +7840,7 @@ function JobDetailModal({
                   {t("backup.actions.delete")}
                 </Button>
               </div>
-            </div>
+            </div>)
           )}
         </DialogContent>
       </Dialog>

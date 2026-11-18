@@ -8,7 +8,7 @@ Handles Proxmox firewall status, rules, and security tool detection.
 import os
 import json
 import subprocess
-import shutil
+import shlex
 import re
 import fcntl
 import threading
@@ -130,11 +130,12 @@ def _is_valid_fw_iface(value):
     return isinstance(value, str) and bool(_FW_IFACE_RE.match(value))
 
 def _run_cmd(cmd, timeout=10, cwd=None):
-    """Run a command and return (returncode, stdout, stderr); optionally set cwd."""
+    """Run a command; optionally execute it in a specific working directory."""
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout, cwd=cwd
-        )
+        kwargs = {"capture_output": True, "text": True, "timeout": timeout}
+        if cwd is not None:
+            kwargs["cwd"] = cwd
+        result = subprocess.run(cmd, **kwargs)
         return result.returncode, result.stdout.strip(), result.stderr.strip()
     except subprocess.TimeoutExpired:
         return -1, "", "Command timed out"
@@ -1570,6 +1571,14 @@ def _detect_fail2ban():
     return info
 
 
+# The copy ProxMenux installs (a wrapper over its clone in /opt/lynis) comes
+# first; then a Lynis installed another way, such as the Debian package or the
+# CISOfy APT repository, which install it in /usr/sbin.
+_LYNIS_PATHS = ("/usr/sbin/lynis", "/usr/bin/lynis",
+                "/usr/local/bin/lynis", "/opt/lynis/lynis")
+_LYNIS_WRAPPER = "/usr/local/bin/lynis"
+_LYNIS_CLONE = "/opt/lynis"
+
 def _lynis_is_managed_wrapper():
     """Require the complete ProxMenux wrapper, not merely its first lines."""
     path = "/usr/local/bin/lynis"
@@ -1623,35 +1632,54 @@ def _lynis_git_checkout_owned():
 
 
 def _find_lynis_installation():
-    """Return (executable, origin), distinguishing Git from external installs."""
-    git_cmd = "/opt/lynis/lynis"
+    """Return executable and owner, preferring a verified ProxMenux checkout."""
     if _lynis_git_checkout_owned():
         if _lynis_is_managed_wrapper():
-            return "/usr/local/bin/lynis", "git"
-        return git_cmd, "git"
+            return _LYNIS_WRAPPER, "git"
+        return _LYNIS_CLONE + "/lynis", "git"
 
-    for path in ("/usr/sbin/lynis", "/usr/bin/lynis",
-                 "/usr/local/bin/lynis", "/opt/lynis/lynis"):
+    for path in _LYNIS_PATHS:
         if os.path.isfile(path) and os.access(path, os.X_OK):
             return path, "external"
-
-    path = shutil.which("lynis")
-    if path and os.path.isabs(path) and os.path.isfile(path) and os.access(path, os.X_OK):
-        return path, "external"
     return None, "none"
 
 
 def _find_lynis_cmd():
-    """Return the selected executable for existing audit callers."""
+    """Compatibility helper for existing audit callers."""
     return _find_lynis_installation()[0]
+
+
+_LYNIS_VERSION_LINE = re.compile(r'^\s*PROGRAM_VERSION="([^"]+)"', re.M)
+
+
+def _lynis_version(lynis_cmd, managed=False):
+    """Read PROGRAM_VERSION, never execute Lynis to query its version.
+
+    Even 'show version' can rewrite the previous /var/log/lynis-report.dat.
+    Only a verified managed wrapper may redirect version reads to the clone.
+    """
+    script = (_LYNIS_CLONE + "/lynis"
+              if managed and lynis_cmd == _LYNIS_WRAPPER else lynis_cmd)
+    try:
+        with open(script, encoding="utf-8", errors="replace") as handle:
+            match = _LYNIS_VERSION_LINE.search(handle.read(16384))
+    except OSError:
+        return ""
+    return match.group(1) if match else ""
+
+
+def _lynis_installed_by_proxmenux():
+    """Conservatively recognize only a verified managed Git checkout."""
+    return _lynis_git_checkout_owned()
 
 
 def _detect_lynis():
     """Detect Lynis installation and status"""
     info = {
         "installed": False,
-        "version": "",
+        "managed": False,
         "source": "none",
+        "version": "",
         "last_scan": None,
         "hardening_index": None,
     }
@@ -1660,11 +1688,8 @@ def _detect_lynis():
 
     if lynis_cmd:
         info["installed"] = True
-        # Direct Git execution requires the checkout's working directory.
-        lynis_cwd = "/opt/lynis" if lynis_cmd == "/opt/lynis/lynis" else None
-        rc, out, _ = _run_cmd([lynis_cmd, "show", "version"], cwd=lynis_cwd)
-        if rc == 0:
-            info["version"] = out.strip()
+        info["managed"] = info["source"] == "git"
+        info["version"] = _lynis_version(lynis_cmd, managed=info["managed"])
 
         # Check for last scan report - use full parser for accurate data
         report = parse_lynis_report()
@@ -1714,8 +1739,7 @@ def run_lynis_audit():
         lynis_cmd = _find_lynis_cmd()
         if not lynis_cmd:
             return False, "Lynis is not installed"
-        # The Git checkout is directly executable only from its directory.
-        lynis_cwd = "/opt/lynis" if lynis_cmd == "/opt/lynis/lynis" else None
+        lynis_cwd = _LYNIS_CLONE if lynis_cmd == _LYNIS_CLONE + "/lynis" else None
 
         _lynis_audit_running = True
         _lynis_audit_progress = "starting"
@@ -1746,7 +1770,7 @@ def run_lynis_audit():
             try:
                 script_cmd = [
                     "script", "-qec",
-                    f"{lynis_cmd} audit system --no-colors --quick",
+                    f"{shlex.quote(lynis_cmd)} audit system --no-colors --quick",
                     output_log
                 ]
                 result = subprocess.run(
@@ -2656,15 +2680,14 @@ def uninstall_lynis():
     removed = []
     lynis_cmd, source = _find_lynis_installation()
     if source == "external":
-        return (False, "Lynis is externally managed; use its package manager",
-                False, "external_installation")
+        return False, "Lynis was not installed by ProxMenux", False, "not_managed"
     if source != "git" or not _lynis_git_checkout_owned():
         return False, "No ProxMenux-managed Lynis installation found", False, "no_files"
 
     remove_wrapper = _lynis_is_managed_wrapper()
     try:
         import shutil
-
+        
         # Remove installation directory
         if os.path.exists("/opt/lynis"):
             shutil.rmtree("/opt/lynis")

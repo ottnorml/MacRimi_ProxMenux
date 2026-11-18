@@ -37,7 +37,9 @@ import { fetchLxcApps, getLxcAppsCached, setLxcAppsCached, subscribeLxcApps } fr
 import { categoryChipStyle, useIsLightTheme } from "../lib/category-color"
 import { getCategoryLabel } from "../lib/category-label"
 import { useT } from "@/lib/i18n/provider"
+import { useAccess } from "../lib/access"
 import { localizeAppEditorError } from "../lib/lxc-app-editor-errors"
+import { OptionSelect } from "./option-select"
 
 // installed_via is optional now — an empty value means "register only,
 // no version tracking, no warnings, just a clickable link". Docker
@@ -393,9 +395,17 @@ const EMPTY_APP: AppConfig = {
 
 const SELFHST_WEBP_BASE = "https://cdn.jsdelivr.net/gh/selfhst/icons@main/webp"
 const SELFHST_THEME_LOGOS: Record<string, { lightTheme: string; darkTheme: string }> = {
+  github: {
+    lightTheme: `${SELFHST_WEBP_BASE}/github.webp`,
+    darkTheme: `${SELFHST_WEBP_BASE}/github-light.webp`,
+  },
   frigate: {
     lightTheme: `${SELFHST_WEBP_BASE}/frigate-dark.webp`,
     darkTheme: `${SELFHST_WEBP_BASE}/frigate-light.webp`,
+  },
+  "hermes-agent": {
+    lightTheme: `${SELFHST_WEBP_BASE}/hermes-agent.webp`,
+    darkTheme: `${SELFHST_WEBP_BASE}/hermes-agent-light.webp`,
   },
   "llama-cpp": {
     lightTheme: `${SELFHST_WEBP_BASE}/llama-cpp.webp`,
@@ -415,13 +425,49 @@ const SELFHST_THEME_LOGOS: Record<string, { lightTheme: string; darkTheme: strin
   },
 }
 
+// Earlier catalog icons that now have a themed selfhst equivalent.
+const THEMED_LOGO_ALIASES: Record<string, string> = {
+  "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons@main/webp/hermes.webp": "hermes-agent",
+}
+
 function selfhstThemeLogos(src: string) {
+  const alias = THEMED_LOGO_ALIASES[src.toLowerCase()]
+  if (alias) return SELFHST_THEME_LOGOS[alias]
   if (!src.toLowerCase().includes("cdn.jsdelivr.net/gh/selfhst/icons")) return null
-  const match = src.toLowerCase().match(/\/(frigate|llama-cpp|portainer|tailscale|vaultwarden)(?:-(?:dark|light))?\.webp(?:[?#].*)?$/)
+  const match = src.toLowerCase().match(/\/(frigate|github|hermes-agent|llama-cpp|portainer|tailscale|vaultwarden)(?:-(?:dark|light))?\.webp(?:[?#].*)?$/)
   return match ? SELFHST_THEME_LOGOS[match[1]] : null
 }
 
 const LOCAL_LOGO_CACHE_PATH = /^\/api\/vms\/[1-9]\d*\/apps\/logo-cache\/[a-f0-9]{32}$/
+
+// Catalog icons that are a black mark on a transparent background, with the
+// version to draw on the dark theme: the light one of their icon set, or
+// "invert". The catalog keeps the list, so a new application gets it with a
+// catalog refresh. Read once for every logo on the page.
+let iconThemes: Record<string, string> | null = null
+let iconThemesRequest: Promise<void> | null = null
+const iconThemeListeners = new Set<() => void>()
+
+function loadIconThemes() {
+  if (iconThemes || iconThemesRequest) return
+  iconThemesRequest = fetchApi<Record<string, string>>("/api/apps/icon-themes")
+    .then(map => {
+      iconThemes = map && typeof map === "object" && !Array.isArray(map) ? map : {}
+    })
+    .catch(() => { iconThemes = {} })
+    .finally(() => iconThemeListeners.forEach(listener => listener()))
+}
+
+function useIconThemes() {
+  const [, setVersion] = useState(0)
+  useEffect(() => {
+    const listener = () => setVersion(version => version + 1)
+    iconThemeListeners.add(listener)
+    loadIconThemes()
+    return () => { iconThemeListeners.delete(listener) }
+  }, [])
+  return iconThemes
+}
 
 function CachedLocalLogo({ src, className }: { src: string; className: string }) {
   const [image, setImage] = useState<{ src: string; url: string } | null>(null)
@@ -454,13 +500,17 @@ function CachedLocalLogo({ src, className }: { src: string; className: string })
 }
 
 export function ThemeAwareLogo({ src, className }: { src: string; className: string }) {
+  const themes = useIconThemes()
   if (LOCAL_LOGO_CACHE_PATH.test(src)) return <CachedLocalLogo src={src} className={className} />
+  const catalogDark = themes?.[src]
   const themed = selfhstThemeLogos(src)
+    ?? (catalogDark && catalogDark !== "invert" ? { lightTheme: src, darkTheme: catalogDark } : null)
   const hideBroken = (e: React.SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.style.display = "none"
   }
   if (!themed) {
-    return <img src={src} alt="" className={className} onError={hideBroken} />
+    const inverted = catalogDark === "invert" ? " dark:invert" : ""
+    return <img src={src} alt="" className={`${className}${inverted}`} onError={hideBroken} />
   }
   return (
     <>
@@ -509,6 +559,8 @@ function parseArgvInput(value: string): string[] {
 
 export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, cacheRevision = 0 }: Props) {
   const t = useT()
+  // Registering and editing the apps of a guest controls it.
+  const { capabilities } = useAccess()
   const isLightTheme = useIsLightTheme()
   // Seed from `initialData` first, then fall back to the shared cache
   // module. Together those two sources cover every reopen scenario
@@ -1754,21 +1806,18 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
               {draft.logo_url && LOCAL_LOGO_CACHE_PATH.test(draft.logo_url) &&
                 <ThemeAwareLogo src={draft.logo_url} className="h-8 w-8 shrink-0 object-contain" />}
               </div>
-                {iconPorts.length > 1 && <select
-                  aria-label={t("vmLxc.appEditor.localLogoPort")}
+                {iconPorts.length > 1 && <OptionSelect
+                  ariaLabel={t("vmLxc.appEditor.localLogoPort")}
                   value={selectedIconPort ? endpointKey(selectedIconPort) : ""}
-                  onChange={event => {
+                  onChange={value => {
                     iconRequest.current += 1
                     iconAbort.current?.abort()
                     setDiscoveringLocalLogo(false)
-                    setIconEndpoint(event.target.value)
+                    setIconEndpoint(value)
                   }}
-                  className="mt-2 rounded border bg-background px-2 py-1 text-xs"
-                >
-                  {iconPorts.map(entry => <option key={endpointKey(entry)} value={endpointKey(entry)}>
-                    {endpointKey(entry)}
-                  </option>)}
-                </select>}
+                  className="mt-2 h-8 w-auto gap-2 bg-background text-xs"
+                  options={iconPorts.map(entry => ({ value: endpointKey(entry), label: endpointKey(entry) }))}
+                />}
               <p className="text-[10px] text-muted-foreground mt-1">{t("vmLxc.appEditor.localLogoHelp")}</p>
             </div>
 
@@ -2647,7 +2696,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
             <div className="text-xs text-muted-foreground">{t("vmLxc.appEditor.hiddenBadge")}</div>
           </div>
         </div>
-        <Button
+        {capabilities.guests && (<Button
           size="sm"
           variant="outline"
           onClick={() => restoreDetection(d.slug)}
@@ -2655,7 +2704,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
         >
           <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
           {t("vmLxc.appEditor.restoreButton")}
-        </Button>
+        </Button>)}
       </div>
     </div>
   )
@@ -2719,7 +2768,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
             )}
           </div>
         </div>
-        <div className="flex flex-row gap-2 flex-shrink-0 sm:justify-end w-full sm:w-auto">
+        {capabilities.guests && (<div className="flex flex-row gap-2 flex-shrink-0 sm:justify-end w-full sm:w-auto">
           <Button
             size="sm"
             onClick={() => openEditor(undefined, { withTracking: !!d.tracking_suggestion, preset: d })}
@@ -2739,7 +2788,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
             <EyeOff className="h-3.5 w-3.5 sm:mr-1" />
             <span className="hidden sm:inline">{t("vmLxc.appEditor.hideButton")}</span>
           </Button>
-        </div>
+        </div>)}
       </div>
     </div>
   )
@@ -2770,7 +2819,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
             </div>
           </div>
         </div>
-        <div className="flex flex-row gap-2 flex-shrink-0 sm:justify-end w-full sm:w-auto">
+        {capabilities.guests && (<div className="flex flex-row gap-2 flex-shrink-0 sm:justify-end w-full sm:w-auto">
           <Button
             size="sm"
             onClick={() => openEditor(undefined, {
@@ -2800,7 +2849,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
             <EyeOff className="h-3.5 w-3.5 sm:mr-1" />
             <span className="hidden sm:inline">{t("vmLxc.appEditor.hideButton")}</span>
           </Button>
-        </div>
+        </div>)}
       </div>
     </div>
   )
@@ -2837,7 +2886,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
                 {hiddenDetections.map(renderRestoreChip)}
               </div>
             )}
-            <div className="pt-1 flex justify-center">
+            {capabilities.guests && (<div className="pt-1 flex justify-center">
               <Button
                 onClick={() => { setBrowseOpen(false); openEditor() }}
                 className="bg-blue-500 hover:bg-blue-600 text-white"
@@ -2845,7 +2894,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
                 <PlusCircle className="h-4 w-4 mr-1.5" />
                 {t("vmLxc.appEditor.registerCustom")}
               </Button>
-            </div>
+            </div>)}
           </CardContent>
         </Card>
       )}
@@ -2901,7 +2950,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
                 {visibleWorkloads.map(renderWorkloadChip)}
               </div>
             )}
-            <div className="pt-1 flex flex-wrap justify-center gap-2">
+            {capabilities.guests && (<div className="pt-1 flex flex-wrap justify-center gap-2">
               <Button
                 onClick={isOciInstall ? refreshOciData : searchInstalledApplications}
                 disabled={searchingApplications}
@@ -2930,7 +2979,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
                 )}
               </Button>
               )}
-            </div>
+            </div>)}
             {detectionNotice && (
               <p className={`text-xs text-center ${detectionNotice.found ? "text-emerald-400" : "text-muted-foreground"}`}>
                 {detectionNotice.text}
@@ -3279,7 +3328,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
         // DE, 10 chars) so the icon-only Search and Register buttons
         // line up as neat equal squares next to the labelled Edit.
         // Desktop: no min-width — each button auto-sizes to its text.
-        <div className="flex flex-row flex-wrap justify-end items-center gap-2">
+        capabilities.guests && (<div className="flex flex-row flex-wrap justify-end items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -3340,7 +3389,7 @@ export function LxcAppPanel({ vmid, ctIp, onChange, managed, initialData, oci, c
               </>
             )}
           </button>
-        </div>
+        </div>)
       )}
 
       {apps.length > 0 && detectionNotice && (

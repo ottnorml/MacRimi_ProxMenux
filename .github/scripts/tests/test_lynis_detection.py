@@ -1,6 +1,7 @@
 """Inert regression tests for Lynis detection and installation ownership (#675)."""
 import ast
 import io
+import shlex
 import os
 import re
 import subprocess
@@ -29,7 +30,7 @@ class LynisDetection(unittest.TestCase):
     def test_bash_checks_debian_package_and_ownership(self):
         source = BASH.read_text()
         self.assertIn("/usr/sbin/lynis", source)
-        self.assertIn('LYNIS_SOURCE="external"', source)
+        self.assertIn('LYNIS_MANAGED=false', source)
         self.assertIn("lynis_install_target_safe", source)
         self.assertIn('! -L /usr/local/bin/lynis', source)
 
@@ -41,7 +42,11 @@ class LynisDetection(unittest.TestCase):
             isabs=os.path.isabs)
         fake_os = SimpleNamespace(path=fake_path,
                                   access=lambda path, mode: path in paths, X_OK=os.X_OK)
-        ns = {"os": fake_os, "shutil": SimpleNamespace(which=lambda name: None),
+        ns = {"os": fake_os,
+              "_LYNIS_WRAPPER": "/usr/local/bin/lynis",
+              "_LYNIS_CLONE": "/opt/lynis",
+              "_LYNIS_PATHS": ("/usr/sbin/lynis", "/usr/bin/lynis",
+                               "/usr/local/bin/lynis", "/opt/lynis/lynis"),
               "_lynis_is_managed_wrapper": lambda: wrapper,
               "_lynis_git_checkout_owned": lambda: git}
         return extracted_python("_find_lynis_installation", ns)()
@@ -75,15 +80,15 @@ class LynisDetection(unittest.TestCase):
               lambda: ("/usr/sbin/lynis", "external")}
         result = extracted_python("uninstall_lynis", ns)()
         self.assertFalse(result[0])
-        self.assertEqual(result[3], "external_installation")
+        self.assertEqual(result[3], "not_managed")
 
     def test_monitor_does_not_offer_git_uninstall_for_apt(self):
         source = UI.read_text()
-        self.assertIn('lynisInfo?.installed && lynisInfo.source === "git"', source)
+        self.assertIn('lynisInfo?.installed && lynisInfo.managed === true', source)
 
     def test_bash_detects_package_in_inert_filesystem(self):
         source = BASH.read_text()
-        names = ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "detect_lynis")
+        names = ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "lynis_script_version", "detect_lynis")
         parts = []
         for name in names:
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
@@ -94,18 +99,18 @@ class LynisDetection(unittest.TestCase):
             root = Path(temp)
             package = root / "usr/sbin/lynis"
             package.parent.mkdir(parents=True)
-            package.write_text("#!/bin/sh\necho 3.1.7\n")
+            package.write_text('#!/bin/sh\nPROGRAM_VERSION="3.1.7"\n')
             package.chmod(0o755)
             script = "\n".join(parts)
             for path in ("/usr/sbin/lynis", "/usr/bin/lynis",
                          "/usr/local/bin/lynis", "/opt/lynis"):
                 script = script.replace(path, str(root / path.lstrip("/")))
-            script += '\ndetect_lynis; printf "%s|%s|%s\\n" "$LYNIS_INSTALLED" "$LYNIS_SOURCE" "$LYNIS_VERSION"\n'
+            script += '\ndetect_lynis; printf "%s|%s|%s\\n" "$LYNIS_INSTALLED" "$LYNIS_MANAGED" "$LYNIS_VERSION"\n'
             result = subprocess.run(["bash", "-c", script], capture_output=True,
                                     text=True, env={**os.environ, "PATH": "/usr/bin:/bin"},
                                     timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), "true|external|3.1.7")
+            self.assertEqual(result.stdout.strip(), "true|false|3.1.7")
 
 
     def test_package_symlink_is_not_a_safe_install_target(self):
@@ -142,7 +147,7 @@ class LynisDetection(unittest.TestCase):
     def test_git_detection_runs_without_wrapper(self):
         source = BASH.read_text()
         parts = []
-        for name in ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "detect_lynis"):
+        for name in ("lynis_is_managed_wrapper", "lynis_managed_marker", "lynis_git_checkout", "lynis_run", "lynis_script_version", "detect_lynis"):
             match = re.search(r"^" + name + r"\(\) \{\n.*?^\}\n", source,
                               re.MULTILINE | re.DOTALL)
             self.assertIsNotNone(match, name)
@@ -156,21 +161,21 @@ class LynisDetection(unittest.TestCase):
                             "https://github.com/CISOfy/lynis.git"], check=True)
             (git / ".proxmenux-managed").write_text("proxmenux-lynis-git-v1\n")
             binary = git / "lynis"
-            binary.write_text("#!/bin/sh\necho git-version\n")
+            binary.write_text('#!/bin/sh\nPROGRAM_VERSION="git-version"\n')
             binary.chmod(0o755)
             pkg = root / "usr/sbin/lynis"
             pkg.parent.mkdir(parents=True)
-            pkg.write_text("#!/bin/sh\necho package-version\n")
+            pkg.write_text('#!/bin/sh\nPROGRAM_VERSION="package-version"\n')
             pkg.chmod(0o755)
             script = "\n".join(parts)
             for path in ("/usr/sbin/lynis", "/usr/bin/lynis",
                          "/usr/local/bin/lynis", "/opt/lynis"):
                 script = script.replace(path, str(root / path.lstrip("/")))
-            script += '\ndetect_lynis; printf "%s|%s|%s\\n" "$LYNIS_INSTALLED" "$LYNIS_SOURCE" "$LYNIS_VERSION"\n'
+            script += '\ndetect_lynis; printf "%s|%s|%s\\n" "$LYNIS_INSTALLED" "$LYNIS_MANAGED" "$LYNIS_VERSION"\n'
             result = subprocess.run(["bash", "-c", script], capture_output=True,
                                     text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout.strip(), "true|git|git-version")
+            self.assertEqual(result.stdout.strip(), "true|true|git-version")
 
 
 
@@ -267,23 +272,36 @@ class LynisDetection(unittest.TestCase):
         self.assertIn(".proxmenux-managed", PYTHON.read_text())
 
 
-    def test_monitor_git_version_runs_in_checkout_directory(self):
-        # Inert AST execution: never invoke the actual Lynis executable.
+    def test_monitor_reads_version_without_running_lynis(self):
         calls = []
-        def run(cmd, **kwargs):
-            calls.append((cmd, kwargs))
-            return 0, "3.1.7", ""
-        ns = {"os": SimpleNamespace(path=SimpleNamespace(isfile=lambda path: False)),
-              "parse_lynis_report": lambda: None, "_run_cmd": run,
+        def version(cmd, managed=False):
+            calls.append((cmd, managed))
+            return "3.1.7"
+        ns = {"os": SimpleNamespace(path=SimpleNamespace(isfile=lambda p: False)),
+              "parse_lynis_report": lambda: None,
+              "_lynis_version": version,
+              "_run_cmd": lambda *a, **k: self.fail("Lynis must not run"),
               "_find_lynis_installation": lambda: ("/opt/lynis/lynis", "git")}
         info = extracted_python("_detect_lynis", ns)()
-        self.assertTrue(info["installed"])
         self.assertEqual(info["version"], "3.1.7")
-        self.assertEqual(calls[0][1].get("cwd"), "/opt/lynis")
+        self.assertTrue(info["managed"])
+        self.assertEqual(calls, [("/opt/lynis/lynis", True)])
         calls.clear()
         ns["_find_lynis_installation"] = lambda: ("/usr/sbin/lynis", "external")
-        extracted_python("_detect_lynis", ns)()
-        self.assertIsNone(calls[0][1].get("cwd"))
+        info = extracted_python("_detect_lynis", ns)()
+        self.assertFalse(info["managed"])
+        self.assertEqual(calls, [("/usr/sbin/lynis", False)])
+
+    def test_version_parser_reads_script_without_execution(self):
+        import re
+        with tempfile.TemporaryDirectory() as root:
+            binary = Path(root) / "lynis"
+            binary.write_text('#!/bin/sh\n  PROGRAM_VERSION="3.1.7"\n')
+            version = extracted_python("_lynis_version", {
+                "os": os, "_LYNIS_CLONE": root,
+                "_LYNIS_WRAPPER": "/usr/local/bin/lynis",
+                "_LYNIS_VERSION_LINE": re.compile(r'^\s*PROGRAM_VERSION="([^"]+)"', re.M)})
+            self.assertEqual(version(str(binary)), "3.1.7")
 
     def test_monitor_git_audit_uses_checkout_cwd_for_pty_and_fallback(self):
         import threading
@@ -302,6 +320,7 @@ class LynisDetection(unittest.TestCase):
                     environ={},
                     remove=lambda path: self.fail("unexpected file deletion"))
                 ns = {"os": fake_os, "subprocess": SimpleNamespace(run=run_script),
+                      "shlex": shlex, "_LYNIS_CLONE": "/opt/lynis",
                       "_run_cmd": run_fallback, "_find_lynis_cmd": lambda: binary,
                       "_state_lock": threading.Lock(),
                       "_lynis_audit_running": False, "_lynis_audit_progress": ""}
@@ -315,6 +334,28 @@ class LynisDetection(unittest.TestCase):
                 self.assertEqual(fallback_calls[0][1].get("cwd"), expected_cwd)
 
 
+
+    def test_pty_quotes_binary_path_to_prevent_command_injection(self):
+        import threading
+        binary = "/tmp/a lynis'; touch /tmp/not-ours; echo '"
+        seen = []
+        def fake_run(cmd, **kwargs):
+            seen.append(cmd)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        fake_os = SimpleNamespace(path=SimpleNamespace(isfile=lambda p: False),
+                                  environ={}, remove=lambda p: self.fail("unexpected deletion"))
+        ns = {"os": fake_os, "_LYNIS_CLONE": "/opt/lynis",
+              "shlex": shlex, "subprocess": SimpleNamespace(run=fake_run),
+              "_run_cmd": lambda *a, **k: (0, "", ""),
+              "_find_lynis_cmd": lambda: binary,
+              "_state_lock": threading.Lock(),
+              "_lynis_audit_running": False, "_lynis_audit_progress": ""}
+        audit = extracted_python("run_lynis_audit", ns)
+        with patch("threading.Thread", side_effect=lambda target, daemon:
+                   SimpleNamespace(start=target)):
+            accepted, _ = audit()
+        self.assertTrue(accepted)
+        self.assertEqual(shlex.split(seen[0][2])[0], binary)
 
     def test_lynis_terminal_catalog_filters(self):
         """Locale-only PRs must trigger the targeted Lynis workflow."""
