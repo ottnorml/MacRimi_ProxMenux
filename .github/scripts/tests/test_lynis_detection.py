@@ -324,8 +324,8 @@ class LynisDetection(unittest.TestCase):
             ("pull_request", "workflow_dispatch"),
         ):
             with self.subTest(event=event):
-                start = f"  {event}:\\n"
-                end = f"\\n  {next_event}:"
+                start = f"  {event}:\n"
+                end = f"\n  {next_event}:"
                 self.assertIn(start, workflow)
                 event_block = workflow.split(start, 1)[1].split(end, 1)[0]
                 self.assertIn("'lang/*.json'", event_block)
