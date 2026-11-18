@@ -16,7 +16,7 @@
   },
   "manageMenu": {
     "heading": "Меню управления (после установки)",
-    "intro": "После установки Lynis каждый последующий запуск открывает меню управления вместо повторного запуска установщика. Из этого меню можно запустить аудит, обновить Lynis через git pull, переустановить или удалить его:",
+    "intro": "Доступные действия зависят от происхождения Lynis: для проверенной Git-установки ProxMenux доступны аудит, обновление, переустановка и удаление, а для внешней установки — только аудит.",
     "imageAlt": "Меню управления Lynis с пунктами аудита, обновления, переустановки и удаления"
   },
   "whyUpstream": {
@@ -53,13 +53,13 @@
   },
   "detection": {
     "heading": "Пути обнаружения",
-    "intro": "Перед отображением меню скрипт проверяет три расположения, чтобы определить, установлен ли уже Lynis:",
+    "intro": "Установщик проверяет известные пути Git-версий и пакетных установок, а также исполняемые файлы из PATH. Основные примеры:",
     "items": [
       "<code>/usr/local/bin/lynis</code> — скрипт-обёртка, установленный с помощью ProxMenux",
       "<code>/opt/lynis/lynis</code> — прямой путь (на случай, если скрипт-обёртка был удалён)",
       "<code>/usr/sbin/lynis</code> — версия, установленная через apt, если пользователь ранее установил её таким способом"
     ],
-    "outro": "Если найден любой из этих вариантов, открывается меню управления. Скрипт <strong>не удаляет</strong> Lynis, установленный через apt, — он удаляет только ту версию, которой управляет сам (<code>/opt/lynis</code> и скрипт-обёртку)."
+    "outro": "Проверенная Git-установка ProxMenux поддерживает аудит, обновление, переустановку и удаление. Установки из пакетов и другие внешние установки позволяют выполнять только аудит; для обновления и удаления используйте их менеджер пакетов."
   },
   "audit": {
     "heading": "Запуск аудита",
@@ -99,7 +99,7 @@
   },
   "update": {
     "heading": "Обновить Lynis",
-    "body": "В меню управления пункт <strong>Обновить Lynis до последней версии</strong> запускает <code>git pull --quiet</code> в каталоге <code>/opt/lynis</code>. Если каталог существует, но не является локальной копией Git-репозитория (например, файлы были скопированы вручную), скрипт выполняет полную переустановку."
+    "body": "Для проверенной Git-установки ProxMenux действие <strong>Обновить Lynis до последней версии</strong> выполняет <code>git pull --quiet</code> в <code>/opt/lynis</code>. Внешние установки обновляются через свой менеджер пакетов и не заменяются Git-копией."
   },
   "reinstall": {
     "heading": "Переустановка / удаление",
@@ -127,7 +127,7 @@
     "cloneBody": "Хосту необходимы доступ к сети и работающий DNS для подключения к <code>github.com</code>. Выполните в консоли <code>curl -sI https://github.com</code> и <code>git ls-remote https://github.com/CISOfy/lynis.git</code>, чтобы увидеть конкретную ошибку (DNS, TLS, прокси, URL репозитория). Если требуется прокси, задайте <code>https_proxy</code> в окружении перед повторным запуском меню.",
     "notFoundTitle": "После установки появляется ошибка «lynis: command not found»",
     "notFoundIntro": "Скрипт-обёртка по пути <code>/usr/local/bin/lynis</code> не был создан либо был удалён. Самое быстрое решение — переустановка через меню. Исправление вручную:",
-    "notFoundCode": "cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\nchmod +x /usr/local/bin/lynis",
+    "notFoundCode": "if [ -e /usr/local/bin/lynis ] || [ -L /usr/local/bin/lynis ]; then\n  printf '%s\\n' 'Existing Lynis path: inspect before replacing it' >&2\nelse\n  cat > /usr/local/bin/lynis <<'EOF'\n#!/bin/bash\ncd /opt/lynis && ./lynis \"$@\"\nEOF\n  chmod +x /usr/local/bin/lynis\nfi",
     "sshTitle": "Audit выводит «Предупреждение: тест SSH-7408 — параметр MaxAuthTries задан неверно»",
     "sshIntro": "Служба SSH допускает слишком много попыток аутентификации на одно соединение. Установите <link>Fail2Ban</link> из ProxMenux (при этом <code>MaxAuthTries=3</code> задаётся автоматически) либо отредактируйте <code>/etc/ssh/sshd_config</code> вручную:",
     "sshCode": "sed -i -E 's/^#?MaxAuthTries.*/MaxAuthTries 3/' /etc/ssh/sshd_config\nsystemctl reload sshd",
